@@ -1,2 +1,6 @@
 etl/.venv/*
 etl/data/raw/*
+etl/src/__pycache__/*
+etl/src/services/__pycache__/*
+etl/src/loaders/__pycache__/*
+etl/src/loaders/__pycache__/dominios.cpython-310.pyc
