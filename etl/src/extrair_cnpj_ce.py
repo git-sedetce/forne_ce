@@ -17,6 +17,55 @@ TIPO_CARGA = "CNPJ_CE"
 UF_CEARA = "CE"
 TAMANHO_LOTE = 100_000
 
+# ============================================================
+# REMOVER BYTES NULOS
+# ============================================================
+
+def remover_bytes_nulos(iteravel, nome_arquivo):
+    """
+    Remove caracteres NUL (\x00) encontrados no arquivo da Receita.
+
+    O csv.reader do Python não aceita linhas contendo NUL.
+    Mantemos um contador e mostramos apenas os primeiros avisos
+    para não poluir o terminal.
+    """
+
+    total_linhas_com_nul = 0
+
+    for numero_linha, linha in enumerate(
+        iteravel,
+        start=1,
+    ):
+        if "\x00" in linha:
+
+            total_linhas_com_nul += 1
+
+            if total_linhas_com_nul <= 10:
+                print(
+                    f"\nAVISO: byte NUL encontrado em "
+                    f"{nome_arquivo} "
+                    f"na linha física {numero_linha:,}. "
+                    f"O caractere será removido."
+                )
+
+            linha = linha.replace(
+                "\x00",
+                "",
+            )
+
+        yield linha
+
+    if total_linhas_com_nul > 0:
+
+        print()
+        print("-" * 70)
+        print(
+            f"ATENÇÃO: {nome_arquivo} continha "
+            f"{total_linhas_com_nul:,} linha(s) "
+            f"com byte NUL."
+        )
+        print("-" * 70)
+
 
 # ============================================================
 # INSERIR LOTE
@@ -172,12 +221,16 @@ def processar_arquivo(
             texto = io.TextIOWrapper(
                 arquivo,
                 encoding="latin1",
-                errors="replace",
                 newline="",
             )
 
-            leitor = csv.reader(
+            linhas_tratadas = remover_bytes_nulos(
                 texto,
+                arquivo_zip.name,
+                )
+
+            leitor = csv.reader(
+                linhas_tratadas,
                 delimiter=";",
                 quotechar='"',
             )

@@ -17,6 +17,51 @@ from services.carga_service import (
 TIPO_CARGA = "ESTABELECIMENTOS"
 TAMANHO_LOTE = 10_000
 
+# ============================================================
+# REMOVER BYTES NULOS
+# ============================================================
+
+def remover_bytes_nulos(iteravel, nome_arquivo):
+    """
+    Remove caracteres NUL (\x00) antes que as linhas
+    sejam processadas pelo csv.reader.
+    """
+
+    total_linhas_com_nul = 0
+
+    for numero_linha, linha in enumerate(
+        iteravel,
+        start=1,
+    ):
+        if "\x00" in linha:
+
+            total_linhas_com_nul += 1
+
+            if total_linhas_com_nul <= 10:
+                print(
+                    f"\nAVISO: byte NUL encontrado em "
+                    f"{nome_arquivo} "
+                    f"na linha física {numero_linha:,}. "
+                    f"O caractere será removido."
+                )
+
+            linha = linha.replace(
+                "\x00",
+                "",
+            )
+
+        yield linha
+
+    if total_linhas_com_nul > 0:
+        print()
+        print("-" * 70)
+        print(
+            f"ATENÇÃO: {nome_arquivo} continha "
+            f"{total_linhas_com_nul:,} linha(s) "
+            f"com byte NUL."
+        )
+        print("-" * 70)
+
 
 # ============================================================
 # DOMÍNIOS
@@ -675,8 +720,13 @@ def processar_arquivo(
                 for linha in arquivo_csv
             )
 
-            leitor = csv.reader(
+            linhas_tratadas = remover_bytes_nulos(
                 texto,
+                arquivo.name,
+            )
+
+            leitor = csv.reader(
+                linhas_tratadas,
                 delimiter=";",
                 quotechar='"',
             )
