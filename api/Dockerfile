@@ -18,7 +18,7 @@ RUN npm ci
 COPY . .
 
 # Porta utilizada pela API
-EXPOSE 3108
+EXPOSE 3000
 
 # Inicializa a aplicação
 CMD ["npm", "start"]

@@ -33,6 +33,188 @@ A base resultante poderá ser utilizada posteriormente por APIs, dashboards, sis
 
 ---
 
+# API de consulta por serviço (CNAE principal)
+
+O projeto inclui uma API Node.js/Express em `api/`. Ela permite localizar empresas pelo código exato do CNAE principal ou por palavras presentes na descrição da atividade.
+
+## Iniciar com Docker
+
+Copie o arquivo de ambiente e ajuste a senha:
+
+```bash
+cp .env.example .env
+docker compose up -d --build
+```
+
+Se o volume do PostgreSQL já existia antes da inclusão da API, aplique uma vez o índice de pesquisa:
+
+```bash
+docker compose exec -T postgres psql \
+  -U "$DB_USER" -d "$DB_NAME" \
+  < database/migrations/002_api_busca_cnae.sql
+```
+
+Em um banco já existente, aplique também as tabelas de autenticação:
+
+```bash
+docker compose exec -T postgres psql \
+  -U "$DB_USER" -d "$DB_NAME" \
+  < database/migrations/003_auth.sql
+```
+
+A API ficará disponível em:
+
+```text
+http://localhost:3000/api/v1
+```
+
+Verifique a conexão com o banco:
+
+```bash
+curl http://localhost:3000/api/v1/health
+```
+
+## Autenticação e autorização
+
+Todas as consultas, exceto o health check, exigem autenticação. No primeiro início da API, o administrador configurado no `.env` é criado automaticamente caso ainda não exista um usuário com perfil `ADMIN`.
+
+Gere uma chave JWT forte, por exemplo:
+
+```bash
+openssl rand -hex 64
+```
+
+Configure no `.env`:
+
+```dotenv
+JWT_SECRET=resultado_do_comando_acima
+ADMIN_NAME=Administrador
+ADMIN_EMAIL=admin@seudominio.com.br
+ADMIN_PASSWORD=UmaSenhaForte123
+```
+
+Faça login:
+
+```bash
+curl -X POST http://localhost:3000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@seudominio.com.br","password":"UmaSenhaForte123"}'
+```
+
+Use o token retornado nas rotas protegidas:
+
+```bash
+curl "http://localhost:3000/api/v1/auth/me" \
+  -H "Authorization: Bearer SEU_TOKEN"
+```
+
+Perfis iniciais:
+
+| Perfil | Permissões |
+|---|---|
+| `ADMIN` | Pesquisar empresas, listar e gerenciar usuários |
+| `CONSULTA` | Pesquisar empresas e CNAEs |
+
+Criar usuário — somente `ADMIN`:
+
+Consulte primeiro `GET /api/v1/perfis` para obter o identificador do perfil desejado. Não presuma que o ID será sempre `2` em todos os bancos.
+
+```bash
+curl -X POST http://localhost:3000/api/v1/usuarios \
+  -H "Authorization: Bearer SEU_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nome":"Usuario Consulta",
+    "email":"consulta@seudominio.com.br",
+    "cpf":"12345678901",
+    "password":"SenhaSegura123",
+    "perfil_id":2
+  }'
+```
+
+Rotas de acesso:
+
+| Método | Rota | Permissão |
+|---|---|---|
+| `POST` | `/api/v1/auth/login` | Pública |
+| `GET` | `/api/v1/auth/me` | Autenticado |
+| `POST` | `/api/v1/auth/logout` | Autenticado |
+| `GET` | `/api/v1/cnaes` | `empresas:read` |
+| `GET` | `/api/v1/empresas` | `empresas:read` |
+| `GET` | `/api/v1/usuarios` | `usuarios:read` |
+| `POST` | `/api/v1/usuarios` | `usuarios:write` |
+| `PATCH` | `/api/v1/usuarios/:id` | `usuarios:write` |
+| `GET` | `/api/v1/perfis` | `usuarios:read` |
+
+Depois da criação inicial, retire `ADMIN_PASSWORD` do ambiente do contêiner. Senhas são armazenadas somente como hash bcrypt. Após cinco tentativas inválidas, o usuário fica bloqueado por 15 minutos. Alterar senha, perfil ou status revoga os tokens emitidos anteriormente.
+
+## Pesquisar CNAEs
+
+Antes de consultar empresas, é possível descobrir os CNAEs relacionados a um serviço:
+
+```bash
+curl "http://localhost:3000/api/v1/cnaes?q=software" \
+  -H "Authorization: Bearer SEU_TOKEN"
+
+curl "http://localhost:3000/api/v1/cnaes?q=6201" \
+  -H "Authorization: Bearer SEU_TOKEN"
+```
+
+## Pesquisar empresas
+
+Por código CNAE principal:
+
+```bash
+curl "http://localhost:3000/api/v1/empresas?cnae=6201501" \
+  -H "Authorization: Bearer SEU_TOKEN"
+```
+
+Por descrição do serviço:
+
+```bash
+curl "http://localhost:3000/api/v1/empresas?servico=software" \
+  -H "Authorization: Bearer SEU_TOKEN"
+```
+
+Com município e paginação:
+
+```bash
+curl "http://localhost:3000/api/v1/empresas?servico=software&municipio=Fortaleza&page=1&limit=20"
+```
+
+Parâmetros disponíveis:
+
+| Parâmetro | Descrição | Padrão |
+|---|---|---|
+| `cnae` | Código CNAE com ou sem pontuação | — |
+| `servico` | Parte da descrição do CNAE, mínimo 3 caracteres | — |
+| `municipio` | Parte do nome do município | Todos |
+| `situacao` | Código da situação cadastral | `02` (ativa) |
+| `competencia` | Competência no formato `YYYY-MM` | Mais recente |
+| `page` | Página solicitada | `1` |
+| `limit` | Itens por página, máximo 100 | `20` |
+
+É obrigatório informar `cnae` ou `servico`. A consulta usa exclusivamente o CNAE principal do estabelecimento. O retorno informa os filtros, a paginação e os dados cadastrais das empresas encontradas.
+
+## Executar a API sem Docker
+
+Com o PostgreSQL já iniciado e Node.js 20 ou superior:
+
+```bash
+cd api
+npm install
+npm start
+```
+
+Testes automatizados:
+
+```bash
+cd api
+npm test
+```
+
+---
+
 # Arquitetura
 
 O fluxo geral é:

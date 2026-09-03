@@ -1,5 +1,9 @@
 services:
 
+  # ==========================================================
+  # POSTGRESQL
+  # ==========================================================
+
   postgres:
     image: postgres:17
     container_name: observatorio-postgres
@@ -11,45 +15,102 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
 
     ports:
-      - "${DB_PORT}:5432"
+      - "${DB_PORT:-5433}:5432"
 
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/init:/docker-entrypoint-initdb.d
+      - ./database/init:/docker-entrypoint-initdb.d:ro
 
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${DB_USER} -d ${DB_NAME}"
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
+
+
+  # ==========================================================
+  # API NODE.JS
+  # ==========================================================
 
   api:
     build:
       context: ./api
       dockerfile: Dockerfile
+
     container_name: observatorio-api
     restart: unless-stopped
+
     environment:
       NODE_ENV: production
-      DB_PORT: 5432
+
+      # Conexão entre containers
       DB_HOST: postgres
+      DB_PORT: 5432
+
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_POOL_MAX: ${DB_POOL_MAX:-10}
+
+      # A API escuta na porta 3000 dentro do container
       API_PORT: 3000
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:4200}
+
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
+
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+
       ADMIN_NAME: ${ADMIN_NAME}
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+
     ports:
-      - "${API_PORT:-3000}:3000"
+      - "${API_PORT:-3108}:3000"
+
     depends_on:
       postgres:
         condition: service_healthy
 
+
+  # ==========================================================
+  # FRONTEND ANGULAR + NGINX
+  # ==========================================================
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+
+    container_name: observatorio-frontend
+    restart: unless-stopped
+
+    ports:
+      # Porta do computador : porta do Nginx
+      - "${FRONTEND_PORT:-8080}:80"
+
+    depends_on:
+      api:
+        condition: service_started
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://127.0.0.1/health || exit 1"
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+
+# ============================================================
+# VOLUMES
+# ============================================================
 
 volumes:
   postgres_data:
