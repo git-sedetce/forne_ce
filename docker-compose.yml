@@ -23,6 +23,33 @@ services:
       timeout: 5s
       retries: 5
 
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: observatorio-api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DB_PORT: 5432
+      DB_HOST: postgres
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_POOL_MAX: ${DB_POOL_MAX:-10}
+      API_PORT: 3000
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:4200}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+      ADMIN_NAME: ${ADMIN_NAME}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+    ports:
+      - "${API_PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 
 volumes:
   postgres_data:

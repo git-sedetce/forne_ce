@@ -1,0 +1,46 @@
+{
+  "name": "forne_ce-api",
+  "version": "1.0.0",
+  "description": "API para trabalhar na consulta do banco de dados da empresas localizadas no estado do Ceará, onde possam forncer seus serviços em prol do estado.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node ./src/server.js",
+    "dev": "nodemon ./src/server.js",
+    "db:migrate": "sequelize-cli db:migrate",
+    "db:migrate:status": "sequelize-cli db:migrate:status",
+    "db:migrate:undo": "sequelize-cli db:migrate:undo",
+    "db:seed": "sequelize-cli db:seed:all"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Pakato14/forne_ce.git"
+  },
+  "keywords": [
+    "industria",
+    "forne_ce",
+    "sde",
+    "desenvolvimento"
+  ],
+  "author": "Daniel Oliveira Araújo",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Pakato14/forne_ce/issues"
+  },
+  "homepage": "https://github.com/Pakato14/forne_ce#readme",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "fs": "^0.0.1-security",
+    "jsonwebtoken": "^9.0.3",
+    "nodemailer": "^9.1.0",
+    "nodemon": "^3.1.14",
+    "path": "^0.12.7",
+    "pg": "^8.23.0",
+    "pg-hstore": "^2.3.4",
+    "sequelize": "^6.37.8",
+    "sequelize-cli": "^6.6.5"
+  }
+}
