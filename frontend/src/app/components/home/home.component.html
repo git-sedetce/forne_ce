@@ -1,0 +1,274 @@
+<section class="home-page">
+  <div class="home-container">
+
+    <!-- CABEÇALHO -->
+
+    <header class="page-header">
+      <div>
+        <span class="eyebrow">
+          Observatório Empresarial
+        </span>
+
+        <h1>
+          Empresas ativas no Ceará
+        </h1>
+
+        <p>
+          Distribuição territorial das empresas
+          e principais atividades econômicas.
+        </p>
+      </div>
+
+      <div class="header-actions">
+        <div class="competencia" *ngIf="competencia">
+          <span>Competência</span>
+          <strong>{{ competencia }}</strong>
+        </div>
+
+        <button type="button" class="btn-login" (click)="irParaLogin()">
+          <i class="fa-solid fa-right-to-bracket"></i>
+          Entrar
+        </button>
+      </div>
+    </header>
+
+    <!-- INDICADORES -->
+
+    <div class="indicators-grid">
+      <div class="indicator-card">
+        <span>Empresas ativas</span>
+
+        <strong>
+          {{ formatarNumero(totalEmpresasAtivas) }}
+        </strong>
+      </div>
+
+      <div class="indicator-card">
+        <span>Municípios analisados</span>
+
+        <strong>
+          {{ municipios.length }}
+        </strong>
+      </div>
+
+      <div class="indicator-card">
+        <span>CNAEs destacados</span>
+
+        <strong>
+          {{ rankingCnaes.length }}
+        </strong>
+      </div>
+
+      <div class="indicator-card">
+        <span>Estado</span>
+
+        <strong>Ceará</strong>
+      </div>
+    </div>
+
+    <!-- CARREGAMENTO -->
+
+    <div class="loading-container" *ngIf="loading">
+      <div class="spinner"></div>
+
+      <span>
+        Carregando indicadores empresariais...
+      </span>
+    </div>
+
+    <!-- ERRO -->
+
+    <div class="alert-error" *ngIf="erroCarregamento && !loading">
+      <i class="fa-solid fa-circle-exclamation"></i>
+
+      <div>
+        <strong>
+          Não foi possível carregar os dados
+        </strong>
+
+        <span>
+          Verifique a conexão com a API.
+        </span>
+      </div>
+
+      <button type="button" (click)="tentarNovamente()">
+        Tentar novamente
+      </button>
+    </div>
+
+    <!-- MAPA E TABELA -->
+
+    <div class="dashboard-layout">
+
+      <!-- MAPA -->
+
+      <article #mapCard class="dashboard-card map-card">
+        <header class="card-header">
+          <div>
+            <span class="card-label">
+              Distribuição territorial
+            </span>
+
+            <h2>
+              Empresas por município
+            </h2>
+          </div>
+
+          <button type="button" class="btn-fullscreen" (click)="alternarTelaCheia()" [attr.aria-label]="
+              mapaTelaCheia
+                ? 'Sair da tela cheia'
+                : 'Exibir mapa em tela cheia'
+            ">
+            <i class="fa-solid" [class.fa-expand]="!mapaTelaCheia" [class.fa-compress]="mapaTelaCheia"></i>
+
+            <span>
+              {{
+              mapaTelaCheia
+              ? 'Sair'
+              : 'Tela cheia'
+              }}
+            </span>
+          </button>
+        </header>
+
+        <div class="map-wrapper">
+          <div id="mapa-ceara"></div>
+
+          <div class="map-legend">
+            <span class="legend-title">
+              Empresas ativas
+            </span>
+
+            <div class="legend-scale">
+              <span *ngFor="let cor of coresMapa" [style.backgroundColor]="cor"></span>
+            </div>
+
+            <div class="legend-labels">
+              <span>Menor</span>
+              <span>Maior</span>
+            </div>
+          </div>
+        </div>
+
+        <footer class="card-footer">
+          <i class="fa-solid fa-computer-mouse"></i>
+
+          <span>
+            Passe o cursor sobre um município
+            para consultar os dados.
+          </span>
+        </footer>
+      </article>
+
+      <!-- TABELA -->
+
+      <article class="dashboard-card table-card">
+        <header class="card-header">
+          <div>
+            <span class="card-label">
+              Atividades econômicas
+            </span>
+
+            <h2>
+              10 CNAEs mais utilizados no Ceará
+            </h2>
+          </div>
+
+          <div class="header-icon">
+            <i class="fa-solid fa-ranking-star"></i>
+          </div>
+        </header>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th class="position-column">
+                  Posição
+                </th>
+
+                <th class="code-column">
+                  CNAE
+                </th>
+
+                <th>
+                  Atividade econômica
+                </th>
+
+                <th class="number-column">
+                  Empresas
+                </th>
+
+                <th class="number-column">
+                  Estabelecimentos
+                </th>
+              </tr>
+            </thead>
+
+            <tbody>
+              <tr *ngFor="
+                  let cnae of rankingCnaes;
+                  let position = index
+                ">
+                <td class="position-column">
+                  <span class="ranking-position" [class.first]="position === 0" [class.second]="position === 1"
+                    [class.third]="position === 2">
+                    {{ position + 1 }}
+                  </span>
+                </td>
+
+                <td class="code-column">
+                  <strong class="cnae-code">
+                    {{ cnae.cnae_formatado }}
+                  </strong>
+                </td>
+
+                <td>
+                  <span class="cnae-description">
+                    {{ cnae.cnae_descricao }}
+                  </span>
+                </td>
+
+                <td class="number-column">
+                  <strong>
+                    {{
+                    formatarNumero(
+                    cnae.quantidade_empresas
+                    )
+                    }}
+                  </strong>
+                </td>
+
+                <td class="number-column">
+                  {{
+                  formatarNumero(
+                  cnae.quantidade_estabelecimentos
+                  )
+                  }}
+                </td>
+              </tr>
+
+              <tr *ngIf="
+                  !rankingCnaes.length &&
+                  !loading
+                ">
+                <td colspan="5" class="empty-table">
+                  Nenhum CNAE encontrado.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <footer class="card-footer">
+          <i class="fa-solid fa-circle-info"></i>
+
+          <span>
+            Ranking baseado no CNAE principal
+            dos estabelecimentos ativos.
+          </span>
+        </footer>
+      </article>
+    </div>
+  </div>
+</section>

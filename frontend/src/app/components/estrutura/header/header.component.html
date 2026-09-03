@@ -1,0 +1,102 @@
+<header class="site-header">
+  <div class="header-accent">
+    <span class="accent-blue"></span>
+    <span class="accent-green"></span>
+    <span class="accent-orange"></span>
+  </div>
+
+  <div class="header-container">
+
+    <!-- LOGOMARCA -->
+
+    <a
+      class="brand"
+      routerLink="/"
+      aria-label="Ir para a página inicial"
+      (click)="fecharMenu()"
+    >
+      <img
+        src="assets/imgs/logo-fornece-horizontal.png"
+        alt="Programa ForneCE"
+      />
+    </a>
+
+    <!-- BOTÃO MOBILE -->
+
+    <button
+      type="button"
+      class="menu-toggle"
+      [class.active]="menuAberto"
+      [attr.aria-expanded]="menuAberto"
+      aria-label="Abrir menu de navegação"
+      (click)="alternarMenu()"
+    >
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+
+    <!-- NAVEGAÇÃO -->
+
+    <div
+      class="navigation-wrapper"
+      [class.open]="menuAberto"
+    >
+      <nav
+        class="main-navigation"
+        aria-label="Navegação principal"
+      >
+        <a
+          routerLink="/"
+          routerLinkActive="active"
+          [routerLinkActiveOptions]="{
+            exact: true
+          }"
+          (click)="fecharMenu()"
+        >
+          <i class="fa-solid fa-house"></i>
+          Início
+        </a>
+
+        <a
+          routerLink="/indicadores"
+          routerLinkActive="active"
+          (click)="fecharMenu()"
+        >
+          <i class="fa-solid fa-chart-column"></i>
+          Indicadores
+        </a>
+
+        <a
+          routerLink="/empresas"
+          routerLinkActive="active"
+          (click)="fecharMenu()"
+        >
+          <i class="fa-solid fa-building"></i>
+          Consultar empresas
+        </a>
+
+        <a
+          routerLink="/sobre"
+          routerLinkActive="active"
+          (click)="fecharMenu()"
+        >
+          <i class="fa-solid fa-circle-info"></i>
+          Sobre
+        </a>
+      </nav>
+
+      <button
+        type="button"
+        class="login-button"
+        (click)="irParaLogin()"
+      >
+        <i class="fa-solid fa-right-to-bracket"></i>
+
+        <span>
+          Área restrita
+        </span>
+      </button>
+    </div>
+  </div>
+</header>
