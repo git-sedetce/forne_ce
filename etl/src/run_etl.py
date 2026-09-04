@@ -43,6 +43,10 @@ ETAPAS = [
         SRC_DIR / "etl_estabelecimentos.py",
     ),
     (
+        "COCIENTE LOCACIONAL",
+        SRC_DIR / "calcular_cociente_locacional.py",
+    ),
+    (
         "SÓCIOS",
         SRC_DIR / "etl_socios.py",
     ),

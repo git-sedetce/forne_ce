@@ -517,3 +517,97 @@ CREATE TABLE IF NOT EXISTS public.simples (
         )
 
 );
+
+-- =====================================================================
+-- ANALYTICS - COCIENTE LOCACIONAL
+--
+-- Mede a concentração relativa de determinado CNAE em um município
+-- comparada à concentração do mesmo CNAE no Estado do Ceará.
+--
+-- Fórmula:
+--
+--     empresas_cnae_municipio / empresas_municipio
+-- QL = ------------------------------------------------
+--     empresas_cnae_estado    / empresas_estado
+--
+-- O cálculo considera:
+--
+--   - somente estabelecimentos localizados no Ceará;
+--   - somente situação cadastral ATIVA (02);
+--   - CNAE principal;
+--   - empresas distintas;
+--   - uma competência específica.
+--
+-- Valores:
+--
+--   QL < 1  -> concentração inferior à média estadual
+--   QL = 1  -> concentração equivalente à média estadual
+--   QL > 1  -> concentração superior à média estadual
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS analytics.cociente_locacional (
+
+    id BIGSERIAL PRIMARY KEY,
+
+    competencia VARCHAR(7) NOT NULL,
+
+    municipio_codigo VARCHAR(4) NOT NULL,
+
+    municipio_nome VARCHAR(150) NOT NULL,
+
+    cnae_codigo VARCHAR(7) NOT NULL,
+
+    cnae_descricao TEXT,
+
+    cociente_locacional NUMERIC(18,8) NOT NULL,
+
+    empresas_municipio_cnae BIGINT NOT NULL,
+
+    empresas_municipio BIGINT NOT NULL,
+
+    empresas_estado_cnae BIGINT NOT NULL,
+
+    empresas_estado BIGINT NOT NULL,
+
+    carga_id BIGINT
+        REFERENCES public.cargas(id),
+
+    created_at TIMESTAMP NOT NULL
+        DEFAULT CURRENT_TIMESTAMP,
+
+    updated_at TIMESTAMP NOT NULL
+        DEFAULT CURRENT_TIMESTAMP,
+
+
+    -- ---------------------------------------------------------
+    -- UNIQUE
+    -- ---------------------------------------------------------
+
+    CONSTRAINT uk_cociente_locacional
+        UNIQUE (
+            competencia,
+            municipio_codigo,
+            cnae_codigo
+        ),
+
+
+    -- ---------------------------------------------------------
+    -- FOREIGN KEYS
+    -- ---------------------------------------------------------
+
+    CONSTRAINT fk_cociente_municipio
+        FOREIGN KEY (
+            municipio_codigo
+        )
+        REFERENCES public.municipios (
+            codigo
+        ),
+
+    CONSTRAINT fk_cociente_cnae
+        FOREIGN KEY (
+            cnae_codigo
+        )
+        REFERENCES public.cnaes (
+            codigo
+        )
+);
