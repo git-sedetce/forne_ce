@@ -7,5 +7,22 @@ import { Component } from '@angular/core';
   styleUrl: './reset-senha.component.css'
 })
 export class ResetSenhaComponent {
+  mostrarSenha = false;
+
+  dados = {
+    identificacao: '',
+    pin: '',
+    novaSenha: ''
+  };
+
+
+  salvarSenha(): void {
+
+    console.log(
+      'Redefinição:',
+      this.dados
+    );
+
+  }
 
 }

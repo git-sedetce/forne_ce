@@ -1,3 +1,26 @@
+/* PALETA DE CORES DO SITEMA */
+:root {
+  --fornece-blue: #07576b;
+  --fornece-blue-dark: #043e4c;
+  --fornece-blue-light: #eaf4f6;
+
+  --fornece-orange: #ff6500;
+  --fornece-orange-dark: #d95300;
+  --fornece-orange-light: #fff2e9;
+
+  --fornece-green: #2f8615;
+
+  --fornece-gray-900: #292929;
+  --fornece-gray-700: #555555;
+  --fornece-gray-500: #8b8b8b;
+  --fornece-gray-300: #d9d9d9;
+  --fornece-gray-100: #f6f7f8;
+
+  --fornece-white: #ffffff;
+
+  --fornece-shadow: 0 15px 40px rgba(0, 0, 0, 0.10);
+}
+
 /* You can add global styles to this file, and also import other style files */
 .map-tooltip {
   display: flex;

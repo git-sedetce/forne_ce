@@ -1,1 +1,166 @@
-<p>reset-senha works!</p>
+<section class="auth-page">
+
+  <div class="reset-card">
+
+    <!-- <div class="reset-brand">
+
+      <img
+        src="assets/imgs/logos/logo_fornece.png"
+        alt="ForneCE"
+      >
+
+    </div> -->
+
+
+    <div class="reset-content">
+
+      <div class="reset-header">
+
+        <span class="reset-icon">
+          <i class="fa-solid fa-key"></i>
+        </span>
+
+        <small>Segurança</small>
+
+        <h1>
+          Redefinir senha
+        </h1>
+
+        <p>
+          Informe os dados solicitados para cadastrar
+          sua nova senha.
+        </p>
+
+      </div>
+
+
+      <form
+        #resetForm="ngForm"
+        (ngSubmit)="salvarSenha()"
+      >
+
+        <!-- LOGIN -->
+        <div class="form-group">
+
+          <label for="identificacao">
+            E-mail ou CPF/CNPJ
+          </label>
+
+          <div class="input-wrapper">
+
+            <i class="fa-regular fa-user"></i>
+
+            <input
+              id="identificacao"
+              type="text"
+              name="identificacao"
+              [(ngModel)]="dados.identificacao"
+              placeholder="Informe seu e-mail ou CPF/CNPJ"
+              required
+            >
+
+          </div>
+
+        </div>
+
+
+        <!-- PIN -->
+        <div class="form-group field-spacing">
+
+          <label for="pin">
+            Código PIN
+          </label>
+
+          <div class="input-wrapper">
+
+            <i class="fa-solid fa-hashtag"></i>
+
+            <input
+              id="pin"
+              type="text"
+              name="pin"
+              [(ngModel)]="dados.pin"
+              placeholder="Digite o código recebido"
+              maxlength="6"
+              required
+            >
+
+          </div>
+
+          <small class="field-help">
+            Digite o código enviado para seu e-mail.
+          </small>
+
+        </div>
+
+
+        <!-- NOVA SENHA -->
+        <div class="form-group field-spacing">
+
+          <label for="novaSenha">
+            Nova senha
+          </label>
+
+          <div class="input-wrapper">
+
+            <i class="fa-solid fa-lock"></i>
+
+            <input
+              id="novaSenha"
+              [type]="mostrarSenha ? 'text' : 'password'"
+              name="novaSenha"
+              [(ngModel)]="dados.novaSenha"
+              placeholder="Digite sua nova senha"
+              required
+            >
+
+            <button
+              type="button"
+              class="password-toggle"
+              (click)="mostrarSenha = !mostrarSenha"
+            >
+
+              <i
+                class="fa-solid"
+                [ngClass]="mostrarSenha ? 'fa-eye-slash' : 'fa-eye'"
+              ></i>
+
+            </button>
+
+          </div>
+
+        </div>
+
+
+        <button
+          type="submit"
+          class="btn-primary"
+          [disabled]="resetForm.invalid"
+        >
+
+          Salvar nova senha
+
+          <i class="fa-solid fa-check"></i>
+
+        </button>
+
+      </form>
+
+
+      <div class="reset-footer">
+
+        <a routerLink="/login">
+
+          <i class="fa-solid fa-arrow-left"></i>
+
+          Voltar para o login
+
+        </a>
+
+      </div>
+
+    </div>
+
+  </div>
+
+</section>
