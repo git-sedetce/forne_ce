@@ -15,12 +15,22 @@ module.exports = {
       updatedAt: new Date()
      },
      {
-      perfil: 'Coordenador',
+      perfil: 'Coordenador-SEXEC',
       createdAt: new Date(),
       updatedAt: new Date()
      },
      {
-      perfil: 'Colaborador',
+      perfil: 'Colaborador-SEXEC',
+      createdAt: new Date(),
+      updatedAt: new Date()
+     },
+     {
+      perfil: 'Usuário-Admin',
+      createdAt: new Date(),
+      updatedAt: new Date()
+     },
+     {
+      perfil: 'Usuário',
       createdAt: new Date(),
       updatedAt: new Date()
      }
