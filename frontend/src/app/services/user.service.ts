@@ -88,6 +88,18 @@ export class UserService {
     return user && roles.includes(user._profile_id);
   }
 
+  getSexec(metodo: string): Observable<any> {
+    return this.http.get(environment.apiUrl + metodo);
+  }
+
+  consultarEmail(email: string) : Observable<any> {
+      return this.http.get(environment.apiUrl + 'checkEmail/' + email)
+    }
+
+    cadastrar_users(data:any):Observable<any> {
+      return this.http.post(environment.apiUrl + 'register', data)
+    }
+
   // ------ AUTENTICAÇÃO ------ //
 
   login(data: any): Observable<any> {

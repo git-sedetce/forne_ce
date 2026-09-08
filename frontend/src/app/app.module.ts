@@ -15,6 +15,8 @@ import { NgxPaginationModule } from 'ngx-pagination';
 import { ToastrModule } from 'ngx-toastr';
 import { provideHttpClient } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
+import { CpfcnpjMaskDirective } from '../directives/cpfcnpj-mask.directive';
+import { CpfCnpjValidacaoDirective } from '../directives/cpfcnpjvalidacao.directive';
 
 @NgModule({
   declarations: [
@@ -24,7 +26,9 @@ import { CommonModule } from '@angular/common';
     FooterComponent,
     LoginComponent,
     RegisterComponent,
-    ResetSenhaComponent
+    ResetSenhaComponent,
+    CpfcnpjMaskDirective,
+    CpfCnpjValidacaoDirective
   ],
   imports: [
     BrowserModule,

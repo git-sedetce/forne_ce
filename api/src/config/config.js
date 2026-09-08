@@ -42,7 +42,7 @@ const databaseConfig = {
   define: {
     timestamps: true,
     underscored: true,
-    freezeTableName: true,
+    freezeTableName: false,
   },
 
   logging: false,

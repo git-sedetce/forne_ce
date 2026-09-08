@@ -369,6 +369,20 @@
   cursor: pointer;
 }
 
+.error-message {
+  display: block;
+  margin-top: 6px;
+  color: #c62828;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.input-container.input-invalid {
+  border-color: #c62828;
+  box-shadow:
+    0 0 0 3px rgba(198, 40, 40, 0.08);
+}
+
 
 /* =====================================================
    BOTÕES

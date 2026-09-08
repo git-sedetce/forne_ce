@@ -1,10 +1,8 @@
 <section class="auth-page">
-
   <div class="auth-shell">
 
     <!-- IDENTIDADE -->
     <aside class="brand-panel">
-
       <div class="brand-content">
 
         <!-- <img
@@ -14,7 +12,6 @@
         > -->
 
         <div class="brand-text">
-
           <span class="eyebrow">
             PROGRAMA FORNECE
           </span>
@@ -26,7 +23,6 @@
           <p>
             Cadastre-se para acessar os recursos e serviços do programa.
           </p>
-
         </div>
 
         <div class="brand-features">
@@ -50,20 +46,14 @@
             <i class="fa-solid fa-location-dot"></i>
             <span>Transforma</span>
           </div>
-
         </div>
-
       </div>
-
     </aside>
 
     <!-- FORMULÁRIO -->
     <main class="form-panel">
-
       <div class="form-container">
-
         <header class="form-header">
-
           <span class="form-icon">
             <i class="fa-solid fa-user-plus"></i>
           </span>
@@ -76,224 +66,131 @@
 
         </header>
 
-        <form
-          #cadastroForm="ngForm"
-          (ngSubmit)="cadastrar()"
-        >
-
+        <form #cadastroForm="ngForm" (ngSubmit)="cadastrar()">
           <div class="form-grid">
 
             <!-- NOME -->
             <div class="form-group full">
-
               <label for="nomeRepresentante">
                 Nome do representante
               </label>
 
               <div class="input-wrapper">
-
                 <i class="fa-solid fa-user"></i>
-
-                <input
-                  id="nomeRepresentante"
-                  type="text"
-                  name="nome_representante"
-                  [(ngModel)]="usuario.nome_representante"
-                  placeholder="Digite o nome completo"
-                  required
-                >
-
+                <input id="nomeRepresentante" type="text" name="nome_representante"
+                  [(ngModel)]="user.nome_representante" placeholder="Digite o nome completo" required>
               </div>
-
             </div>
 
             <!-- CPF/CNPJ -->
             <div class="form-group">
-
               <label for="cpfCnpj">
                 CPF ou CNPJ
               </label>
 
-              <div class="input-wrapper">
-
+              <div class="input-wrapper" [class.input-invalid]="cpfCnpj.invalid && (cpfCnpj.dirty || cpfCnpj.touched)">
                 <i class="fa-regular fa-id-card"></i>
-
-                <input
-                  id="cpfCnpj"
-                  type="text"
-                  name="cpf_cnpj"
-                  [(ngModel)]="usuario.cpf_cnpj"
-                  placeholder="CPF ou CNPJ"
-                  required
-                >
-
+                <input id="cpfCnpj" type="text" name="cpf_cnpj" [(ngModel)]="user.cpf_cnpj" appCpfcnpjMask="cpf_cnpj"
+                  appCpfCnpjValidacao="cpf_cnpj" #cpfCnpj="ngModel" placeholder="Digite seu CPF ou CNPJ" required>
               </div>
 
+              <small class="error-message" *ngIf="cpfCnpj.invalid && (cpfCnpj.dirty || cpfCnpj.touched)">
+                <span *ngIf="cpfCnpj.errors?.['required']">
+                  Informe o CPF ou CNPJ.
+                </span>
+                <span *ngIf="cpfCnpj.errors?.['cpfInvalido']">
+                  CPF inválido.
+                </span>
+                <span *ngIf="cpfCnpj.errors?.['cnpjInvalido']">
+                  CNPJ inválido.
+                </span>
+              </small>
             </div>
+
 
             <!-- EMAIL -->
             <div class="form-group">
-
               <label for="email">
                 E-mail
               </label>
-
               <div class="input-wrapper">
-
                 <i class="fa-regular fa-envelope"></i>
-
-                <input
-                  id="email"
-                  type="email"
-                  name="user_email"
-                  [(ngModel)]="usuario.user_email"
-                  placeholder="nome@exemplo.com.br"
-                  required
-                >
-
+                <input id="email" type="email" (blur)="consultaEmail(user.user_email, cadastroForm)" name="user_email" [(ngModel)]="user.user_email"
+                  placeholder="nome@exemplo.com.br" required>
               </div>
-
             </div>
 
             <!-- SECRETARIA -->
             <div class="form-group full">
-
               <label for="secretaria">
                 Secretaria Executiva
               </label>
-
               <div class="input-wrapper">
-
                 <i class="fa-solid fa-building-columns"></i>
-
-                <select
-                  id="secretaria"
-                  name="secretaria_executiva_id"
-                  [(ngModel)]="usuario.secretaria_executiva_id"
-                  required
-                >
-
+                <select id="secretaria" name="secretaria_executiva_id" [(ngModel)]="user.sexec_id"
+                  required>
                   <option value="" disabled>
                     Selecione uma secretaria
                   </option>
-
-                  <option
-                    *ngFor="let secretaria of secretarias_executivas"
-                    [value]="secretaria.id"
-                  >
-                    {{ secretaria.nome }}
+                  <option *ngFor="let secretaria of lista_sexec" [value]="secretaria.id">
+                    {{ secretaria.secretaria }}
                   </option>
-
                 </select>
-
               </div>
-
             </div>
 
             <!-- SENHA -->
             <div class="form-group">
-
               <label for="senha">
                 Senha
               </label>
 
               <div class="input-wrapper">
-
                 <i class="fa-solid fa-lock"></i>
+                <input id="senha" [type]="mostrarSenha ? 'text' : 'password'" name="user_password"
+                  [(ngModel)]="user.user_password" placeholder="Digite sua senha" required>
 
-                <input
-                  id="senha"
-                  [type]="mostrarSenha ? 'text' : 'password'"
-                  name="user_password"
-                  [(ngModel)]="usuario.user_password"
-                  placeholder="Digite sua senha"
-                  required
-                >
-
-                <button
-                  type="button"
-                  class="password-toggle"
-                  (click)="mostrarSenha = !mostrarSenha"
-                >
-                  <i
-                    class="fa-solid"
-                    [ngClass]="mostrarSenha ? 'fa-eye-slash' : 'fa-eye'"
-                  ></i>
+                <button type="button" class="password-toggle" (click)="mostrarSenha = !mostrarSenha">
+                  <i class="fa-solid" [ngClass]="mostrarSenha ? 'fa-eye-slash' : 'fa-eye'"></i>
                 </button>
-
               </div>
-
             </div>
 
             <!-- CONFIRMAR -->
             <div class="form-group">
-
               <label for="confirmarSenha">
                 Confirmar senha
               </label>
 
               <div class="input-wrapper">
-
                 <i class="fa-solid fa-shield-halved"></i>
-
-                <input
-                  id="confirmarSenha"
-                  [type]="mostrarConfirmacao ? 'text' : 'password'"
-                  name="user_confirm_password"
-                  [(ngModel)]="usuario.user_confirm_password"
-                  placeholder="Repita sua senha"
-                  required
-                >
-
-                <button
-                  type="button"
-                  class="password-toggle"
-                  (click)="mostrarConfirmacao = !mostrarConfirmacao"
-                >
-                  <i
-                    class="fa-solid"
-                    [ngClass]="
+                <input id="confirmarSenha" [type]="mostrarConfirmacao ? 'text' : 'password'"
+                  name="user_confirm_password" [(ngModel)]="user.confirm_password"
+                  placeholder="Repita sua senha" required>
+                <button type="button" class="password-toggle" (click)="mostrarConfirmacao = !mostrarConfirmacao">
+                  <i class="fa-solid" [ngClass]="
                       mostrarConfirmacao
                         ? 'fa-eye-slash'
                         : 'fa-eye'
-                    "
-                  ></i>
+                    "></i>
                 </button>
-
               </div>
-
             </div>
-
           </div>
 
-          <button
-            type="submit"
-            class="btn-primary"
-            [disabled]="cadastroForm.invalid"
-          >
-
+          <button type="submit" class="btn-primary" [disabled]="cadastroForm.invalid">
             Criar minha conta
-
             <i class="fa-solid fa-arrow-right"></i>
-
           </button>
 
           <div class="form-footer">
-
             Já possui cadastro?
-
             <a routerLink="/login">
               Entrar
             </a>
-
           </div>
-
         </form>
-
       </div>
-
     </main>
-
   </div>
-
 </section>
