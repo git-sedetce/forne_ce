@@ -9,7 +9,10 @@ module.exports = {
         primaryKey: true,
         type: Sequelize.INTEGER
       },
-      nome: {
+      nome_representante: {
+        type: Sequelize.STRING
+      },
+      cpf_cnpj: {
         type: Sequelize.STRING
       },
       user_email: {

@@ -26,7 +26,7 @@ class UserController {
       const salt = await bcrypt.genSalt(10);
       novoUser.user_password = await bcrypt.hash(novoUser.user_password, salt);
       novoUser.user_pin = Math.floor(1000 + Math.random() * 9000);
-      novoUser.profile_id = 4;
+      novoUser.profile_id = 6;
       novoUser.user_active = false;
 
       const userCriado = await database.users.create(novoUser);
@@ -61,10 +61,10 @@ class UserController {
     await transporter.sendMail({
       from: "cotec@sde.ce.gov.br",
       to: process.env.EMAIL_ADMIN,
-      subject: "Cadastro de usuário do Sistema de Cotonicultura da SDE",
+      subject: "Cadastro de usuário ao Sistema Fornece Ceará",
       html: `
       <h3>Cadastro realizado com sucesso</h3>
-      <p>${user.nome} realizou o cadastro.</p>
+      <p>${user.nome_representante} realizou o cadastro.</p>
     `,
     });
 
@@ -72,12 +72,12 @@ class UserController {
     await transporter.sendMail({
       from: "cotec@sde.ce.gov.br",
       to: user.user_email,
-      subject: "Código PIN - Sistema de Cotonicultura da SDE",
+      subject: "Código PIN - Sistema Fornece Ceará",
       html: `
       <h2>Código PIN</h2>
       <h3>${user.user_pin}</h3>
       <p>
-        <a href="https://www.cotonicultura.sde.ce.gov.br/resetSenha">
+        <a href="https://www.fornece.ce.gov.br/resetSenha">
           Clique aqui para criar sua senha
         </a>
       </p>
@@ -137,7 +137,7 @@ class UserController {
         from: "cotec@sde.ce.gov.br",
         to: user.user_email,
         subject: "Novo Pin para nova senha",
-        html: `<h3>Segue o novo Pin!!</h3><p><strong>${newPin}</strong><br>Crie sua nova senha no seguinte link: <a href="https://cotonicultura.sde.ce.gov.br/resetSenha">Resetar Senha</a>`,
+        html: `<h3>Segue o novo Pin!!</h3><p><strong>${newPin}</strong><br>Crie sua nova senha no seguinte link: <a href="https://www.fornece.ce.gov.br/resetSenha">Resetar Senha</a>`,
       };
       //   console.log("mailOptions", mailOptions);
       var emailRetorno = null;
@@ -161,42 +161,95 @@ class UserController {
 
   static async login(req, res) {
     const user = req.body;
+    console.log("user", user);
 
     try {
-      const verificaUser = await database.users.findOne({
-        where: { user_email: user.user_email },
-      });
+      // Verifica se foi informado email ou CPF
+      if (!user.user_email && !user.cpf_cnpj) {
+        return res.status(400).json({
+          message: "Informe o e-mail ou CPF/CNPJ.",
+        });
+      }
+
+      // Monta as condições de busca
+      const condicoes = [];
+
+      if (user.user_email) {
+        condicoes.push({
+          user_email: user.user_email,
+        });
+      }
+
+      if (user.cpf_cnpj) {
+        condicoes.push({
+          cpf_cnpj: user.cpf_cnpj,
+        });
+      }
+
+      // =====================================================
+      // Se não encontrou no users
+      // =====================================================
       if (!verificaUser) {
-        return res.status(404).send({ message: "Usuário não encontrado!" });
+        verificaUser = await database.Agente.findOne({
+          where: {
+            [Op.or]: condicoes,
+          },
+        });
       }
+
+      console.log("USER:", verificaUser);
+
+      // Usuário não encontrado
+      if (!verificaUser) {
+        return res.status(404).json({
+          message: "Usuário não encontrado!",
+        });
+      }
+
+      // =====================================================
+      // Verifica se o usuário está ativo
+      // =====================================================
       if (!verificaUser.user_active) {
-        return res
-          .status(400)
-          .send({ message: "Consulte o Administrador do sistema" });
+        return res.status(400).json({
+          message: "Consulte o Administrador do sistema",
+        });
       }
-      if (
-        !(await bcrypt.compare(user.user_password, verificaUser.user_password))
-      ) {
-        return res.status(400).send({ message: "Crendenciais inválidos!" });
+
+      // =====================================================
+      // Verifica a senha
+      // =====================================================
+      if (!(await bcrypt.compare(user.user_password, verificaUser.user_password))) {
+        return res.status(400).json({
+          message: "Credenciais inválidas!",
+        });
       }
+
+      // =====================================================
+      // Gera o token
+      // =====================================================
       const token = jwt.sign(
         {
           _id: verificaUser.id,
           _profile_id: verificaUser.profile_id,
-          _user_name: verificaUser.user_name,
+          _user_name: nomeUsuario,
         },
         process.env.ACCESS_TOKEN,
         {
           expiresIn: "8h",
         },
       );
+
       return res.json({
         auth: true,
         token: token,
         message: "Usuário logado com sucesso!",
       });
     } catch (error) {
-      res.send({ message: "Problemas ao realizar login!" });
+      console.error("Erro ao realizar login:", error);
+
+      return res.status(500).json({
+        message: "Problemas ao realizar login!",
+      });
     }
   }
 
@@ -206,8 +259,8 @@ class UserController {
         order: [["nome", "ASC"]],
         attributes: [
           "id",
-          "nome",
-          "user_name",
+          "nome_representante",
+          "cpf_cnpj",
           "user_email",
           "user_active",
           "profile_id",
@@ -306,13 +359,13 @@ class UserController {
 
     const apaga = await database.users.findOne({
           where: { id: Number(id) },
-          attributes: ["nome"],
+          attributes: ["nome_representante"],
         });
 
     try {
       await database.users.destroy({ where: { id: Number(id) } });
       return res.status(200).json({
-        mensagem: `O Usuario ${apaga.nome} foi excluido com sucesso!!`,
+        mensagem: `O Usuario ${apaga.nome_representante} foi excluido com sucesso!!`,
       });
     } catch (erro) {
       return res.status(500).json(erro.message);
