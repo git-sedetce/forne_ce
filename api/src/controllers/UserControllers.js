@@ -184,7 +184,7 @@ class UserController {
 
   static async login(req, res) {
     const user = req.body;
-    // console.log("user", user);
+    console.log("user", user);
 
     try {
       // Verifica se foi informado email ou CPF
@@ -213,7 +213,7 @@ class UserController {
       // Se não encontrou no users
       // =====================================================
       if (!verificaUser) {
-        verificaUser = await database.Agente.findOne({
+        verificaUser = await database.users.findOne({
           where: {
             [Op.or]: condicoes,
           },

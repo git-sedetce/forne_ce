@@ -1,12 +1,10 @@
 <section class="login-page">
-
   <div class="login-card">
 
     <!-- ============================================
          PAINEL INSTITUCIONAL
     ============================================= -->
     <aside class="login-brand">
-
       <div class="brand-inner">
 
         <!-- <img
@@ -16,68 +14,53 @@
         > -->
 
         <div class="brand-copy">
-
           <span class="brand-label">
             PROGRAMA FORNECE
           </span>
-
           <h1>
             Fortalecendo a cadeia produtiva do Estado.
           </h1>
-
           <p>
             Conectando empresas, oportunidades e desenvolvimento
             para fortalecer a economia do Ceará.
           </p>
-
         </div>
 
 
         <div class="brand-items">
-
           <div class="brand-item">
             <i class="fa-solid fa-users"></i>
-
             <div>
               <strong>Conecta</strong>
               <span>Empresas e oportunidades</span>
             </div>
           </div>
 
-
           <div class="brand-item green">
             <i class="fa-solid fa-industry"></i>
-
             <div>
               <strong>Desenvolve</strong>
               <span>A cadeia produtiva</span>
             </div>
           </div>
 
-
           <div class="brand-item">
             <i class="fa-solid fa-chart-line"></i>
-
             <div>
               <strong>Fortalece</strong>
               <span>A economia cearense</span>
             </div>
           </div>
 
-
           <div class="brand-item orange">
             <i class="fa-solid fa-location-dot"></i>
-
             <div>
               <strong>Transforma</strong>
               <span>O Estado do Ceará</span>
             </div>
           </div>
-
         </div>
-
       </div>
-
     </aside>
 
 
@@ -85,11 +68,8 @@
          LOGIN
     ============================================= -->
     <main class="login-form-area">
-
       <div class="login-form-container">
-
         <header class="login-header">
-
           <div class="login-icon">
             <i class="fa-solid fa-right-to-bracket"></i>
           </div>
@@ -113,71 +93,54 @@
 
         <form
           #loginForm="ngForm"
-          (ngSubmit)="login()"
-        >
+          (ngSubmit)="login()">
 
           <!-- LOGIN -->
           <div class="form-group">
-
             <label for="login">
               E-mail ou CPF/CNPJ
             </label>
-
             <div class="input-container">
-
               <span class="input-icon">
                 <i class="fa-regular fa-user"></i>
               </span>
-
               <input
                 id="login"
                 type="text"
                 name="login"
-                [(ngModel)]="credenciais.login"
+                [(ngModel)]="loginUsers.user"
                 placeholder="Digite seu e-mail ou CPF/CNPJ"
                 autocomplete="username"
-                required
-              >
-
+                required>
             </div>
-
           </div>
 
 
           <!-- SENHA -->
           <div class="form-group">
-
             <div class="label-row">
-
               <label for="password">
                 Senha
               </label>
-
             </div>
-
             <div class="input-container">
-
               <span class="input-icon">
                 <i class="fa-solid fa-lock"></i>
               </span>
-
               <input
                 id="password"
                 [type]="mostrarSenha ? 'text' : 'password'"
                 name="password"
-                [(ngModel)]="credenciais.password"
+                [(ngModel)]="loginUsers.password"
                 placeholder="Digite sua senha"
                 autocomplete="current-password"
-                required
-              >
-
+                required>
 
               <button
                 type="button"
                 class="show-password"
                 (click)="mostrarSenha = !mostrarSenha"
-                [attr.aria-label]="mostrarSenha ? 'Ocultar senha' : 'Mostrar senha'"
-              >
+                [attr.aria-label]="mostrarSenha ? 'Ocultar senha' : 'Mostrar senha'">
 
                 <i
                   class="fa-solid"
@@ -187,25 +150,19 @@
                       : 'fa-eye'
                   "
                 ></i>
-
               </button>
-
             </div>
-
           </div>
 
 
           <!-- ESQUECI SENHA -->
           <div class="forgot-row">
-
             <button
               type="button"
               class="forgot-password"
-              (click)="abrirModalEsqueciSenha()"
-            >
+              (click)="abrirModalEsqueciSenha()">
               Esqueci minha senha
             </button>
-
           </div>
 
 
@@ -213,35 +170,23 @@
           <button
             type="submit"
             class="login-button"
-            [disabled]="loginForm.invalid"
-          >
-
+            [disabled]="loginForm.invalid">
             <span>Entrar</span>
-
             <i class="fa-solid fa-arrow-right"></i>
-
           </button>
-
 
           <!-- CADASTRO -->
           <div class="register-area">
-
             <span>
               Ainda não possui conta?
             </span>
-
             <a routerLink="/cadastro">
               Cadastre-se
             </a>
-
           </div>
-
         </form>
-
       </div>
-
     </main>
-
   </div>
 
 
@@ -289,26 +234,19 @@
 
 
       <div class="form-group modal-field">
-
         <label for="emailRecuperacao">
           E-mail cadastrado
         </label>
-
         <div class="input-container">
-
           <span class="input-icon">
             <i class="fa-regular fa-envelope"></i>
           </span>
-
           <input
             id="emailRecuperacao"
             type="email"
             [(ngModel)]="emailRecuperacao"
-            placeholder="nome@exemplo.com.br"
-          >
-
+            placeholder="nome@exemplo.com.br">
         </div>
-
       </div>
 
 
@@ -316,8 +254,7 @@
         type="button"
         class="login-button"
         [disabled]="!emailRecuperacao"
-        (click)="recuperarSenha()"
-      >
+        (click)="recuperarSenha()">
 
         <span>
           Enviar código
@@ -326,9 +263,6 @@
         <i class="fa-solid fa-paper-plane"></i>
 
       </button>
-
     </div>
-
   </div>
-
 </section>
