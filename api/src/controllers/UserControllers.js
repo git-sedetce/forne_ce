@@ -6,45 +6,68 @@ const nodemailer = require("nodemailer");
 class UserController {
   static async cadastraUser(req, res) {
     try {
-      const novoUser = req.body;
+      const {
+        nome_representante,
+        cpf_cnpj,
+        user_email,
+        user_password,
+        sexec_id,
+      } = req.body;
 
-      if (!novoUser.user_password || !novoUser.user_email) {
-        return res.status(400).json({ message: "Dados obrigatórios ausentes" });
+      if (!user_password || !user_email) {
+        return res.status(400).json({
+          message: "Dados obrigatórios ausentes",
+        });
       }
 
-      if(novoUser.user_email.split('@')[1] !== 'sde.ce.gov.br') {
-        return res.status(400).json({ message: "Email inválido para cadastro!" });
+      const dominio = user_email.split("@")[1]?.toLowerCase();
+
+      if (dominio !== "sde.ce.gov.br") {
+        return res.status(400).json({
+          message: "Email inválido para cadastro!",
+        });
       }
 
       const emailExistente = await database.users.findOne({
-        where: { user_email: novoUser.user_email },
+        where: {
+          user_email: user_email.toLowerCase(),
+        },
       });
+
       if (emailExistente) {
-        return res.status(400).json({ message: "Email já cadastrado!" });
-      }      
+        return res.status(400).json({
+          message: "Email já cadastrado!",
+        });
+      }
 
       const salt = await bcrypt.genSalt(10);
-      novoUser.user_password = await bcrypt.hash(novoUser.user_password, salt);
-      novoUser.user_pin = Math.floor(1000 + Math.random() * 9000);
-      novoUser.profile_id = 6;
-      novoUser.user_active = false;
+      const senhaHash = await bcrypt.hash(user_password, salt);
 
-      const userCriado = await database.users.create(novoUser);
+      const userCriado = await database.users.create({
+        nome_representante,
+        cpf_cnpj,
+        user_email: user_email.toLowerCase(),
+        user_password: senhaHash,
+        sexec_id: Number(sexec_id),
+        user_pin: Math.floor(1000 + Math.random() * 9000),
+        profile_id: 6,
+        user_active: false,
+      });
 
-      // Remove a senha antes de responder
-      const { user_password, ...data } = userCriado.toJSON();
+      const { user_password: _, ...data } = userCriado.toJSON();
 
-      // 🔹 Retorna o cadastro imediatamente
       res.status(201).json(data);
 
-      // 🔹 Envio de e-mails em background
-      UserController.enviarEmailsCadastro(novoUser).catch((err) =>
-        console.error("Erro ao enviar e-mail:", err),
-      );
+      UserController.enviarEmailsCadastro(data).catch((error) => {
+        console.error("Erro ao enviar e-mail:", error);
+      });
     } catch (error) {
-      console.error(error);
+      console.error("Erro ao cadastrar usuário:", error);
+
       if (!res.headersSent) {
-        return res.status(500).json({ message: error.message });
+        return res.status(500).json({
+          message: error.message,
+        });
       }
     }
   }
@@ -161,7 +184,7 @@ class UserController {
 
   static async login(req, res) {
     const user = req.body;
-    console.log("user", user);
+    // console.log("user", user);
 
     try {
       // Verifica se foi informado email ou CPF
@@ -197,7 +220,7 @@ class UserController {
         });
       }
 
-      console.log("USER:", verificaUser);
+      // console.log("USER:", verificaUser);
 
       // Usuário não encontrado
       if (!verificaUser) {
@@ -218,7 +241,9 @@ class UserController {
       // =====================================================
       // Verifica a senha
       // =====================================================
-      if (!(await bcrypt.compare(user.user_password, verificaUser.user_password))) {
+      if (
+        !(await bcrypt.compare(user.user_password, verificaUser.user_password))
+      ) {
         return res.status(400).json({
           message: "Credenciais inválidas!",
         });
@@ -358,9 +383,9 @@ class UserController {
     const { id } = req.params;
 
     const apaga = await database.users.findOne({
-          where: { id: Number(id) },
-          attributes: ["nome_representante"],
-        });
+      where: { id: Number(id) },
+      attributes: ["nome_representante"],
+    });
 
     try {
       await database.users.destroy({ where: { id: Number(id) } });

@@ -59,6 +59,8 @@ export class RegisterComponent implements OnInit {
       this.user.confirm_password,
     );
 
+    // console.log('user', this.user);
+
     this.serviceUser.cadastrar_users(this.user).subscribe({
       next: (res: any) => {
         this.user.id = res.id;
