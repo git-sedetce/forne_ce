@@ -17,6 +17,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { CpfcnpjMaskDirective } from '../directives/cpfcnpj-mask.directive';
 import { CpfCnpjValidacaoDirective } from '../directives/cpfcnpjvalidacao.directive';
+import { ListaUsuariosComponent } from './components/admin/lista-usuarios/lista-usuarios.component';
 
 @NgModule({
   declarations: [
@@ -28,7 +29,8 @@ import { CpfCnpjValidacaoDirective } from '../directives/cpfcnpjvalidacao.direct
     RegisterComponent,
     ResetSenhaComponent,
     CpfcnpjMaskDirective,
-    CpfCnpjValidacaoDirective
+    CpfCnpjValidacaoDirective,
+    ListaUsuariosComponent
   ],
   imports: [
     BrowserModule,

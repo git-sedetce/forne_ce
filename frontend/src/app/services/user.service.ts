@@ -4,6 +4,7 @@ import { environment } from '../../environments/environment.development';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Md5 } from 'ts-md5';
+import { jwtDecode } from 'jwt-decode';
 
 interface JwtPayload {
   exp?: number;
@@ -11,10 +12,9 @@ interface JwtPayload {
 }
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class UserService {
-
   private userSubject = new BehaviorSubject<any>(null);
   user$ = this.userSubject.asObservable();
 
@@ -37,12 +37,13 @@ export class UserService {
     }
 
     const token = this.getToken();
+
     if (!token) {
       return;
     }
 
     try {
-      const decoded = jwtDecode(token);
+      const decoded = jwtDecode<JwtPayload>(token);
       const now = Math.floor(Date.now() / 1000);
       if (decoded.exp && decoded.exp <= now) {
         localStorage.removeItem('access_token');
@@ -92,28 +93,24 @@ export class UserService {
     return this.http.get(environment.apiUrl + metodo);
   }
 
-  consultarEmail(email: string) : Observable<any> {
-      return this.http.get(environment.apiUrl + 'checkEmail/' + email)
-    }
+  consultarEmail(email: string): Observable<any> {
+    return this.http.get(environment.apiUrl + 'checkEmail/' + email);
+  }
 
-    cadastrar_users(data:any):Observable<any> {
-      return this.http.post(environment.apiUrl + 'register', data)
-    }
+  cadastrar_users(data: any): Observable<any> {
+    return this.http.post(environment.apiUrl + 'register', data);
+  }
 
   // ------ AUTENTICAÇÃO ------ //
 
   login(data: any): Observable<any> {
-    // Transforma o campo email/cpf para o formato esperado pelo backend
-    const loginData = this.transformLoginData(data);
-
-    return this.http.post<any>(environment.apiUrl + 'login', loginData).pipe(
+    return this.http.post<any>(environment.apiUrl + 'login', data).pipe(
       tap((response) => {
         localStorage.setItem('access_token', response.token);
-        const decoded = jwtDecode(response.token);
+        const decoded = jwtDecode<JwtPayload>(response.token);
+        // console.log('TOKEN DECODIFICADO:', decoded);
         this.userSubject.next(decoded);
         this.redirecionarPorPerfil();
-
-        // this.router.navigate(['/admin']);
       }),
     );
   }
@@ -129,37 +126,32 @@ export class UserService {
     switch (Number(user._profile_id)) {
       // Admin
       case 1:
-        this.router.navigate(['/admin/admin']);
+        this.router.navigate(['/lista-usuarios']);
         break;
 
-      // Gestão
+      // Secretario
       case 2:
-        this.router.navigate(['/admin/admin']);
-        break;
-
-      // Suporte
-      case 3:
-        this.router.navigate(['/admin/admin']);
-        break;
-
-      // Supervisão
-      case 4:
-        this.router.navigate(['/admin/admin']);
-        break;
-
-      // Agente
-      case 5:
-        this.router.navigate(['/admin/admin']);
-        break;
-
-      // Conformidade
-      case 6:
         this.router.navigate(['/home']);
         break;
 
-      // Cliente
-      case 7:
-        this.router.navigate(['/credimpacto/editdados']);
+      // Coordenador SEXEC
+      case 3:
+        this.router.navigate(['/home']);
+        break;
+
+      // Colaborador SEXEC
+      case 4:
+        this.router.navigate(['/home']);
+        break;
+
+      // Usuário Admin
+      case 5:
+        this.router.navigate(['/home']);
+        break;
+
+      // Usuário Comum
+      case 6:
+        this.router.navigate(['/home']);
         break;
 
       default:
@@ -195,6 +187,10 @@ export class UserService {
     this.router.navigate(['/login']);
   }
 
+  reset_password(data: any): Observable<any> {
+    return this.http.post(environment.apiUrl + 'reset', data);
+  }
+
   // ------ REQUISIÇÕES ------ //
 
   resetPin(data: any): Observable<any> {
@@ -203,7 +199,3 @@ export class UserService {
     return this.http.post(environment.apiUrl + 'newPin', loginData);
   }
 }
-function jwtDecode(token: string): JwtPayload {
-  throw new Error('Function not implemented.');
-}
-

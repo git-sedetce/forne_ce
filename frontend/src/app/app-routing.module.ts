@@ -4,28 +4,33 @@ import { HomeComponent } from './components/home/home.component';
 import { LoginComponent } from './components/admin/login/login.component';
 import { RegisterComponent } from './components/admin/register/register.component';
 import { ResetSenhaComponent } from './components/admin/reset-senha/reset-senha.component';
+import { ListaUsuariosComponent } from './components/admin/lista-usuarios/lista-usuarios.component';
 
 const routes: Routes = [
   {
-  path: '',
-  component: HomeComponent,
-},
-{
-  path: 'login',
-  component: LoginComponent,
-},
-{
-  path: 'cadastro',
-  component: RegisterComponent,
-},
-{
-  path: 'reset-senha',
-  component: ResetSenhaComponent,
-},
+    path: '',
+    component: HomeComponent,
+  },
+  {
+    path: 'login',
+    component: LoginComponent,
+  },
+  {
+    path: 'cadastro',
+    component: RegisterComponent,
+  },
+  {
+    path: 'reset-senha',
+    component: ResetSenhaComponent,
+  },
+  {
+    path: 'lista-usuarios',
+    component: ListaUsuariosComponent,
+  },
 ];
 
 @NgModule({
   imports: [RouterModule.forRoot(routes)],
-  exports: [RouterModule]
+  exports: [RouterModule],
 })
-export class AppRoutingModule { }
+export class AppRoutingModule {}

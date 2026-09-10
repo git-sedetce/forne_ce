@@ -28,10 +28,11 @@ export class LoginComponent {
   }
 
   login(): void {
-    console.log('loginUser', this.loginUsers)
+    // console.log('loginUser', this.loginUsers)
     this.userService.login(this.loginUsers).subscribe({
       next: (res) => res,
-      error: (e) => (this.toastr.error(e.error.message), this.loginForm.reset())
+      error: (e) => (console.error('error', e), this.loginForm.reset())
+      // error: (e) => (this.toastr.error(e.error.message), console.error('error', e), this.loginForm.reset())
     })
 
   }
@@ -52,21 +53,16 @@ export class LoginComponent {
 
 
   abrirModalEsqueciSenha(): void {
-
     this.modalEsqueciSenha = true;
-
   }
 
 
   fecharModalEsqueciSenha(): void {
-
     this.modalEsqueciSenha = false;
-
   }
 
 
   recuperarSenha(): void {
-
     if (!this.emailRecuperacao) {
       return;
     }
@@ -75,7 +71,6 @@ export class LoginComponent {
       'Recuperar senha:',
       this.emailRecuperacao
     );
-
     this.fecharModalEsqueciSenha();
 
   }

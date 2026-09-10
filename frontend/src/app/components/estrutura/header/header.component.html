@@ -75,6 +75,14 @@
           <i class="fa-solid fa-building"></i>
           Consultar empresas
         </a>
+        <a *ngIf="authenticated" && profile ===1
+          routerLink="/lista-usuarios"
+          routerLinkActive="active"
+          (click)="fecharMenu()"
+        >
+          <i class="fa-solid fa-user-group"></i>
+          Lista de Usuários
+        </a>
 
         <a
           routerLink="/sobre"

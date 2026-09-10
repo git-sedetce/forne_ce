@@ -54,7 +54,7 @@
               id="identificacao"
               type="text"
               name="identificacao"
-              [(ngModel)]="dados.identificacao"
+              [(ngModel)]="resetSenha.user_email"
               placeholder="Informe seu e-mail ou CPF/CNPJ"
               required
             >
@@ -79,7 +79,7 @@
               id="pin"
               type="text"
               name="pin"
-              [(ngModel)]="dados.pin"
+              [(ngModel)]="resetSenha.user_pin"
               placeholder="Digite o código recebido"
               maxlength="6"
               required
@@ -109,7 +109,7 @@
               id="novaSenha"
               [type]="mostrarSenha ? 'text' : 'password'"
               name="novaSenha"
-              [(ngModel)]="dados.novaSenha"
+              [(ngModel)]="resetSenha.user_password"
               placeholder="Digite sua nova senha"
               required
             >

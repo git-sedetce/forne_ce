@@ -183,100 +183,116 @@ class UserController {
   }
 
   static async login(req, res) {
-    const user = req.body;
-    console.log("user", user);
+  const { user, password } = req.body;
 
-    try {
-      // Verifica se foi informado email ou CPF
-      if (!user.user_email && !user.cpf_cnpj) {
-        return res.status(400).json({
-          message: "Informe o e-mail ou CPF/CNPJ.",
-        });
-      }
+  console.log("LOGIN:", { user });
 
-      // Monta as condições de busca
-      const condicoes = [];
-
-      if (user.user_email) {
-        condicoes.push({
-          user_email: user.user_email,
-        });
-      }
-
-      if (user.cpf_cnpj) {
-        condicoes.push({
-          cpf_cnpj: user.cpf_cnpj,
-        });
-      }
-
-      // =====================================================
-      // Se não encontrou no users
-      // =====================================================
-      if (!verificaUser) {
-        verificaUser = await database.users.findOne({
-          where: {
-            [Op.or]: condicoes,
-          },
-        });
-      }
-
-      // console.log("USER:", verificaUser);
-
-      // Usuário não encontrado
-      if (!verificaUser) {
-        return res.status(404).json({
-          message: "Usuário não encontrado!",
-        });
-      }
-
-      // =====================================================
-      // Verifica se o usuário está ativo
-      // =====================================================
-      if (!verificaUser.user_active) {
-        return res.status(400).json({
-          message: "Consulte o Administrador do sistema",
-        });
-      }
-
-      // =====================================================
-      // Verifica a senha
-      // =====================================================
-      if (
-        !(await bcrypt.compare(user.user_password, verificaUser.user_password))
-      ) {
-        return res.status(400).json({
-          message: "Credenciais inválidas!",
-        });
-      }
-
-      // =====================================================
-      // Gera o token
-      // =====================================================
-      const token = jwt.sign(
-        {
-          _id: verificaUser.id,
-          _profile_id: verificaUser.profile_id,
-          _user_name: nomeUsuario,
-        },
-        process.env.ACCESS_TOKEN,
-        {
-          expiresIn: "8h",
-        },
-      );
-
-      return res.json({
-        auth: true,
-        token: token,
-        message: "Usuário logado com sucesso!",
-      });
-    } catch (error) {
-      console.error("Erro ao realizar login:", error);
-
-      return res.status(500).json({
-        message: "Problemas ao realizar login!",
+  try {
+    // =====================================================
+    // Validação
+    // =====================================================
+    if (!user || !password) {
+      return res.status(400).json({
+        message: "Informe o e-mail/CPF/CNPJ e a senha.",
       });
     }
+
+    // Remove caracteres de CPF/CNPJ caso existam
+    const documento = String(user).replace(/\D/g, "");
+
+    // Verifica se o valor informado parece ser um e-mail
+    const isEmail = String(user).includes("@");
+
+    // =====================================================
+    // Busca o usuário
+    // =====================================================
+    let verificaUser;
+
+    if (isEmail) {
+      verificaUser = await database.users.findOne({
+        where: {
+          user_email: String(user).trim().toLowerCase(),
+        },
+      });
+    } else {
+      verificaUser = await database.users.findOne({
+        where: {
+          cpf_cnpj: documento,
+        },
+      });
+    }
+
+    // =====================================================
+    // Usuário não encontrado
+    // =====================================================
+    if (!verificaUser) {
+      return res.status(404).json({
+        message: "Usuário não encontrado!",
+      });
+    }
+
+    // =====================================================
+    // Usuário inativo
+    // =====================================================
+    if (!verificaUser.user_active) {
+      return res.status(403).json({
+        message: "Consulte o Administrador do sistema.",
+      });
+    }
+
+    // =====================================================
+    // Verifica senha
+    // =====================================================
+    const senhaCorreta = await bcrypt.compare(
+      password,
+      verificaUser.user_password
+    );
+
+    if (!senhaCorreta) {
+      return res.status(401).json({
+        message: "Credenciais inválidas!",
+      });
+    }
+
+    // =====================================================
+    // Gera token
+    // =====================================================
+    const token = jwt.sign(
+      {
+        _id: verificaUser.id,
+        _profile_id: verificaUser.profile_id,
+        _user_name: verificaUser.nome_representante,
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: process.env.JWT_EXPIRES_IN || "8h",
+      }
+    );
+
+    // =====================================================
+    // Retorno
+    // =====================================================
+    return res.status(200).json({
+      auth: true,
+      token,
+      user: {
+        id: verificaUser.id,
+        nome: verificaUser.nome_representante,
+        email: verificaUser.user_email,
+        profile_id: verificaUser.profile_id,
+        sexec_id: verificaUser.sexec_id,
+      },
+      message: "Usuário logado com sucesso!",
+    });
+
+  } catch (error) {
+    console.error("Erro ao realizar login:", error);
+
+    return res.status(500).json({
+      message: "Problemas ao realizar login!",
+    });
   }
+}
 
   static async pegaUsers(req, res) {
     try {
