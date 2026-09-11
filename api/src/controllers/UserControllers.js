@@ -326,6 +326,39 @@ class UserController {
     }
   }
 
+  static async userId(req, res) {
+    const { id } = req.params;
+    try {
+      const getUser = await database.users.findOne({
+        where: { id: Number(id) },
+        attributes: [
+          "id",
+          "nome_representante",
+          "cpf_cnpj",
+          "user_email",
+          "user_active",
+          "profile_id",
+          "sexec_id",
+        ],
+        include: [
+          {
+            association: "ass_user_profile",
+            attributes: ["id", "perfil"],
+          },
+          {
+            association: "ass_user_sexec",
+            attributes: ["id", "secretaria", "sigla"],
+          },
+        ],
+      });
+
+      return res.status(200).json(getUser);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ message: "Erro ao buscar usuário" });
+    }
+  }
+
   static async pegaSexec(req, res) {
     try {
       const getSexec = await database.secretaria_executiva.findAll({
@@ -335,6 +368,18 @@ class UserController {
       return res.status(200).json(getSexec);
     } catch (error) {
       return res.status(500).json({ message: "Secretaria não encontrado" });
+    }
+  }
+
+  static async pegaProfiles(req, res) {
+    try {
+      const getProfiles = await database.profile.findAll({
+        order: ["perfil"],
+        attributes: ["id", "perfil"],
+      });
+      return res.status(200).json(getProfiles);
+    } catch (error) {
+      return res.status(500).json({ message: "Perfil não encontrado" });
     }
   }
 

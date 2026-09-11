@@ -93,6 +93,26 @@ export class UserService {
     return this.http.get(environment.apiUrl + metodo);
   }
 
+  getUsers(metodo: string): Observable<any> {
+    return this.http.get(environment.apiUrl + metodo);
+  }
+
+  userId(id: number): Observable<any> {
+    // return this.http.get<any>(`${environment.apiUrl}/companiebyid/${id}`);
+    return this.http.get(environment.apiUrl + 'userbyid/' + id);
+  }
+
+  getProfiles(metodo: string): Observable<any> {
+    return this.http.get(environment.apiUrl + metodo);
+  }
+
+  atualizarUser(id: number, dados: any): Observable<any> {
+    return this.http.put<any>(
+      `${environment.apiUrl}/atualizaUser/${id}`,
+      dados,
+    );
+  }
+
   consultarEmail(email: string): Observable<any> {
     return this.http.get(environment.apiUrl + 'checkEmail/' + email);
   }

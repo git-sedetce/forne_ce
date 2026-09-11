@@ -10,6 +10,7 @@ import { LoginComponent } from './components/admin/login/login.component';
 import { RegisterComponent } from './components/admin/register/register.component';
 import { ResetSenhaComponent } from './components/admin/reset-senha/reset-senha.component';
 import { FormsModule } from '@angular/forms';
+import { ReactiveFormsModule } from '@angular/forms';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { NgxPaginationModule } from 'ngx-pagination';
 import { ToastrModule } from 'ngx-toastr';
@@ -38,6 +39,7 @@ import { ListaUsuariosComponent } from './components/admin/lista-usuarios/lista-
     BrowserAnimationsModule,
     AppRoutingModule,
     FormsModule,
+    ReactiveFormsModule,
     NgxPaginationModule,
 
     ToastrModule.forRoot({
