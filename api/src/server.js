@@ -28,6 +28,6 @@ routes(app)
 
 const port = process.env.PORT || 3108
 
-app.listen(port, () => console.log(`O servidor está On`))
+app.listen(port, () => console.log(`O servidor está On Port: ${port}`))
 
 module.exports = app

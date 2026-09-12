@@ -45,7 +45,13 @@ module.exports = {
       sigla: 'ADECE',
       createdAt: new Date(),
       updatedAt: new Date()
-     },     
+     },    
+     {
+      secretaria: 'Parceiro Estratégico do Estado do Ceará',
+      sigla: 'PEEC',
+      createdAt: new Date(),
+      updatedAt: new Date()
+     },    
     ], {});
   },
 
