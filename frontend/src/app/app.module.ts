@@ -14,11 +14,12 @@ import { ReactiveFormsModule } from '@angular/forms';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { NgxPaginationModule } from 'ngx-pagination';
 import { ToastrModule } from 'ngx-toastr';
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { CpfcnpjMaskDirective } from '../directives/cpfcnpj-mask.directive';
 import { CpfCnpjValidacaoDirective } from '../directives/cpfcnpjvalidacao.directive';
 import { ListaUsuariosComponent } from './components/admin/lista-usuarios/lista-usuarios.component';
+import { authInterceptor } from './services/interceptors/auth.interceptor';
 
 @NgModule({
   declarations: [
@@ -49,7 +50,7 @@ import { ListaUsuariosComponent } from './components/admin/lista-usuarios/lista-
       progressBar: true,
     }),
   ],
-  providers: [ provideHttpClient(), ],
+  providers: [provideHttpClient(withInterceptors([authInterceptor]))],
   bootstrap: [AppComponent]
 })
 export class AppModule { }

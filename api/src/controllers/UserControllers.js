@@ -297,7 +297,7 @@ class UserController {
   static async pegaUsers(req, res) {
     try {
       const getUser = await database.users.findAll({
-        order: [["nome", "ASC"]],
+        order: [["nome_representante", "ASC"]],
         attributes: [
           "id",
           "nome_representante",
@@ -386,7 +386,7 @@ class UserController {
   static async atualizaUser(req, res) {
     const { id } = req.params;
     const user = req.body;
-    // console.log('user', user)
+    console.log('user', user)
     try {
       await database.users.update(user, { where: { id: Number(id) } });
       const updateUser = await database.users.findOne({

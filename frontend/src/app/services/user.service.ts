@@ -108,7 +108,7 @@ export class UserService {
 
   atualizarUser(id: number, dados: any): Observable<any> {
     return this.http.put<any>(
-      `${environment.apiUrl}/atualizaUser/${id}`,
+      environment.apiUrl + 'atualizaUser/' + id,
       dados,
     );
   }

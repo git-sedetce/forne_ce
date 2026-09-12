@@ -5,6 +5,8 @@ import { LoginComponent } from './components/admin/login/login.component';
 import { RegisterComponent } from './components/admin/register/register.component';
 import { ResetSenhaComponent } from './components/admin/reset-senha/reset-senha.component';
 import { ListaUsuariosComponent } from './components/admin/lista-usuarios/lista-usuarios.component';
+import { authGuard } from './services/guards/auth.guard';
+import { roleGuard } from './services/guards/role.guard';
 
 const routes: Routes = [
   {
@@ -26,6 +28,8 @@ const routes: Routes = [
   {
     path: 'lista-usuarios',
     component: ListaUsuariosComponent,
+    canActivate: [authGuard, roleGuard],
+    data: { roles: [1] },
   },
 ];
 

@@ -10,7 +10,7 @@ require("dotenv").config();
     if(!token)
         return res.sendStatus(401);
 
-        jwt.verify(token, process.env.ACCESS_TOKEN, (err, userDecoded) =>{
+        jwt.verify(token, process.env.JWT_SECRET, (err, userDecoded) =>{
             if(err)
                 return res.sendStatus(403);
               // console.log('userDecoded', userDecoded)

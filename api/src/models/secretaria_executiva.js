@@ -21,6 +21,7 @@ module.exports = (sequelize, DataTypes) => {
   }, {
     sequelize,
     modelName: 'secretaria_executiva',
+    tableName: 'secretaria_executivas',
   });
   return secretaria_executiva;
 };

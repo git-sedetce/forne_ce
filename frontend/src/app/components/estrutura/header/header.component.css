@@ -176,6 +176,28 @@
   transform: translateY(-7px) rotate(-45deg);
 }
 
+/* =====================================
+   USUÁRIO
+===================================== */
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  white-space: nowrap;
+}
+
+.user-greeting {
+  font-family: "Inter", sans-serif;
+  font-size: 16px;
+  color: #007a8a;
+}
+
+.user-greeting strong {
+  font-weight: 700;
+  color: #007a8a;
+}
+
 /* TABLET E CELULAR */
 
 @media (max-width: 900px) {

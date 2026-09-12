@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { UserService } from '../../../services/user.service';
 import { Perfil } from '../../../models/perfil';
+import { formatarCpfCnpj } from '../../../../directives/cpfcnpj-mask.directive';
 
 @Component({
   selector: 'app-lista-usuarios',
@@ -48,7 +49,7 @@ export class ListaUsuariosComponent implements OnInit {
         [
           Validators.required,
           Validators.minLength(11),
-          Validators.maxLength(12),
+          Validators.maxLength(18),
         ],
       ],
       user_email: ['', [Validators.required, Validators.email]],
@@ -128,6 +129,10 @@ export class ListaUsuariosComponent implements OnInit {
     }
 
     this.atualizarPagina();
+  }
+
+  formatarDocumento(valor: string | null | undefined): string {
+    return formatarCpfCnpj(valor);
   }
 
   // ============================================================
