@@ -1,0 +1,1118 @@
+<section class="consulta-page">
+
+  <div class="container-fluid page-container">
+
+    <!-- =====================================================
+         CABEÇALHO
+    ====================================================== -->
+
+    <div class="page-header">
+
+      <div class="header-content">
+
+        <span class="eyebrow">
+          OBSERVATÓRIO DE EMPRESAS
+        </span>
+
+        <h1>
+          Consulta de empresas por CNAE
+        </h1>
+
+        <p>
+          Localize empresas ativas no Ceará e selecione
+          potenciais fornecedores ou parceiros.
+        </p>
+
+      </div>
+
+      <div class="selection-summary" *ngIf="quantidadeSelecionadas > 0">
+
+        <span>Selecionadas</span>
+
+        <strong>
+          {{ quantidadeSelecionadas }}/10
+        </strong>
+
+      </div>
+
+    </div>
+
+
+    <!-- =====================================================
+         PESQUISA
+    ====================================================== -->
+
+    <section class="search-card">
+
+      <div class="search-card-header">
+        <div>
+          <h2>
+            <i class="fa-solid fa-filter"></i>
+            Filtros de pesquisa
+          </h2>
+
+          <p>
+            Utilize um ou mais filtros para refinar a busca de empresas.
+          </p>
+        </div>
+
+        <button type="button" class="btn-clear" (click)="limparPesquisa()">
+          <i class="fa-solid fa-rotate-left"></i>
+          Limpar filtros
+        </button>
+      </div>
+
+
+      <div class="filter-grid">
+
+        <!-- ATIVIDADE ECONÔMICA -->
+        <div class="filter-field atividade-field">
+
+          <label for="atividade">
+            Atividade econômica
+          </label>
+
+          <div class="input-wrapper">
+
+            <i class="fa-solid fa-briefcase"></i>
+
+            <input id="atividade" type="text" [(ngModel)]="atividadePesquisa" (input)="filtrarAtividades()"
+              (focus)="abrirListaAtividades()" placeholder="Ex.: panificação, transporte, construção..."
+              autocomplete="off">
+
+            <i *ngIf="carregandoAtividades" class="fa-solid fa-spinner fa-spin atividade-loading"></i>
+
+          </div>
+
+
+          <div class="autocomplete-list" *ngIf="
+      mostrarAtividades &&
+      atividadesFiltradas.length
+    ">
+
+            <button type="button" class="autocomplete-item" *ngFor="
+        let atividade
+        of atividadesFiltradas
+      " (click)="
+        selecionarAtividade(
+          atividade
+        )
+      ">
+
+              <span class="atividade-cnae">
+                {{ atividade.codigo_formatado }}
+              </span>
+
+              <span class="atividade-descricao">
+                {{ atividade.descricao }}
+              </span>
+
+            </button>
+
+          </div>
+
+
+          <small>
+            Pesquise pela descrição da atividade.
+          </small>
+
+        </div>
+
+
+        <!-- CNAE -->
+        <div class="filter-field">
+
+          <label for="cnae">
+            CNAE
+          </label>
+
+          <div class="input-wrapper">
+
+            <i class="fa-solid fa-magnifying-glass"></i>
+
+            <input id="cnae" type="text" [(ngModel)]="cnae" maxlength="10" placeholder="Ex.: 1091101">
+
+          </div>
+
+          <small>
+            Informe os 7 números do CNAE, se souber.
+          </small>
+
+        </div>
+
+
+        <!-- REGIÃO -->
+        <div class="filter-field">
+
+          <label for="regiao">
+            Região do Ceará
+          </label>
+
+          <div class="input-wrapper">
+
+            <i class="fa-solid fa-map"></i>
+
+            <select id="regiao" [(ngModel)]="regiao" (change)="onRegiaoChange()">
+
+              <option value="">
+                Todas as regiões
+              </option>
+
+              <option *ngFor="let item of regioes" [value]="item">
+                {{ item }}
+              </option>
+
+            </select>
+
+          </div>
+
+          <small>
+            Selecione uma região de planejamento.
+          </small>
+
+        </div>
+
+
+        <!-- MUNICÍPIO -->
+        <div class="filter-field">
+
+          <label for="municipio">
+            Município
+          </label>
+
+          <div class="input-wrapper">
+
+            <i class="fa-solid fa-location-dot"></i>
+
+            <select id="municipio" [(ngModel)]="municipio">
+
+              <option value="">
+                Todos os municípios
+              </option>
+
+              <option *ngFor="let item of municipiosFiltrados" [value]="item">
+                {{ item }}
+              </option>
+
+            </select>
+
+          </div>
+
+          <small *ngIf="regiao">
+            Municípios da região {{ regiao }}.
+          </small>
+
+          <small *ngIf="!regiao">
+            Todos os municípios do Ceará.
+          </small>
+
+        </div>
+
+
+        <!-- PORTE -->
+        <div class="filter-field">
+
+          <label for="porte">
+            Porte da empresa
+          </label>
+
+          <div class="input-wrapper">
+
+            <i class="fa-solid fa-building"></i>
+
+            <select id="porte" [(ngModel)]="porte">
+
+              <option value="">
+                Todos os portes
+              </option>
+
+              <option value="01">
+                Micro Empresa
+              </option>
+
+              <option value="03">
+                Empresa de Pequeno Porte
+              </option>
+
+              <option value="05">
+                Demais
+              </option>
+
+              <option value="00">
+                Não informado
+              </option>
+
+            </select>
+
+          </div>
+
+          <small>
+            Filtre pelo porte cadastrado na Receita Federal.
+          </small>
+
+        </div>
+
+
+        <!-- BOTÃO -->
+        <div class="filter-actions">
+
+          <button type="button" class="btn-search" [disabled]="carregando" (click)="pesquisar()">
+
+            <i class="fa-solid" [ngClass]="
+            carregando
+              ? 'fa-spinner fa-spin'
+              : 'fa-magnifying-glass'
+          "></i>
+
+            {{ carregando ? 'Consultando...' : 'Consultar empresas' }}
+
+          </button>
+
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- =====================================================
+         ERRO / AVISO
+    ====================================================== -->
+
+    <div class="alert-message" *ngIf="mensagemErro">
+
+      <i class="fa-solid fa-circle-exclamation"></i>
+
+      <span>
+        {{ mensagemErro }}
+      </span>
+
+      <button type="button" (click)="mensagemErro = ''">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+
+    </div>
+
+
+    <!-- =====================================================
+         CARREGANDO
+    ====================================================== -->
+
+    <div class="loading-state" *ngIf="carregando">
+
+      <i class="fa-solid fa-spinner fa-spin"></i>
+
+      <strong>
+        Consultando empresas...
+      </strong>
+
+      <span>
+        Aguarde enquanto buscamos os estabelecimentos.
+      </span>
+
+    </div>
+
+
+    <!-- =====================================================
+         RESULTADO
+    ====================================================== -->
+
+    <ng-container *ngIf="pesquisou && !carregando">
+
+      <!-- RESUMO DA CONSULTA -->
+
+      <div class="result-summary" *ngIf="totalItens > 0">
+
+        <div>
+
+          <span class="result-label">
+            CNAE
+          </span>
+
+          <strong>
+            {{ cnaeFormatado }}
+          </strong>
+
+          <p>
+            {{ cnaeDescricao }}
+          </p>
+
+        </div>
+
+
+        <div class="result-numbers">
+
+          <div>
+
+            <span>Empresas encontradas</span>
+
+            <strong>
+              {{ totalItens | number:'1.0-0' }}
+            </strong>
+
+          </div>
+
+          <div>
+
+            <span>Competência</span>
+
+            <strong>
+              {{ competencia }}
+            </strong>
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+      <!-- ===================================================
+           BARRA DE CONTROLE
+      ==================================================== -->
+
+      <div class="list-toolbar" *ngIf="totalItens > 0">
+
+        <div class="selection-info">
+
+          <i class="fa-solid fa-circle-info"></i>
+
+          <span>
+            Selecione até
+            <strong>10 empresas</strong>
+            para gerar o documento de contato.
+          </span>
+
+        </div>
+
+
+        <div class="page-size">
+
+          <label>
+            Exibir
+          </label>
+
+          <select [(ngModel)]="limite" (change)="mudarLimite()">
+
+            <option [ngValue]="10">
+              10
+            </option>
+
+            <option [ngValue]="20">
+              20
+            </option>
+
+            <option [ngValue]="50">
+              50
+            </option>
+
+            <option [ngValue]="100">
+              100
+            </option>
+
+          </select>
+
+        </div>
+
+      </div>
+
+
+      <!-- ===================================================
+           GRID PRINCIPAL
+      ==================================================== -->
+
+      <div class="content-grid" *ngIf="totalItens > 0">
+
+        <!-- ================================================
+             EMPRESAS
+        ================================================= -->
+
+        <div class="companies-column">
+
+          <article class="company-card" *ngFor="let empresa of empresas"
+            [class.selected]="empresaSelecionada(empresa.cnpj)">
+
+            <!-- checkbox -->
+
+            <div class="company-checkbox">
+
+              <input type="checkbox" [checked]="empresaSelecionada(empresa.cnpj)"
+                (change)="selecionarEmpresa(empresa, $event)">
+
+            </div>
+
+
+            <!-- informações -->
+
+            <div class="company-content">
+
+              <div class="company-header">
+
+                <div>
+
+                  <span class="company-name-fantasy">
+                    {{
+                    empresa.nome_fantasia ||
+                    'Nome fantasia não informado'
+                    }}
+                  </span>
+
+                  <h3>
+                    {{ empresa.razao_social }}
+                  </h3>
+
+                  <span class="cnpj">
+                    {{ formatarCnpj(empresa.cnpj) }}
+                  </span>
+
+                </div>
+
+
+                <div class="company-badges">
+
+                  <span class="badge-active">
+                    <i class="fa-solid fa-circle"></i>
+                    ATIVA
+                  </span>
+
+                  <span class="badge-type">
+                    {{ empresa.tipo_estabelecimento }}
+                  </span>
+
+                </div>
+
+              </div>
+
+
+              <div class="company-info-grid">
+
+                <!-- MUNICÍPIO -->
+
+                <div class="info-item">
+
+                  <i class="fa-solid fa-location-dot"></i>
+
+                  <div>
+
+                    <span>Localização</span>
+
+                    <strong>
+                      {{ empresa.municipio }}/{{ empresa.uf }}
+                    </strong>
+
+                    <small>
+                      {{ empresa.bairro || 'Bairro não informado' }}
+                    </small>
+
+                  </div>
+
+                </div>
+
+
+                <!-- TELEFONE -->
+
+                <div class="info-item">
+
+                  <i class="fa-solid fa-phone"></i>
+
+                  <div>
+
+                    <span>Telefone</span>
+
+                    <strong>
+                      {{
+                      formatarTelefone(
+                      empresa.ddd_1,
+                      empresa.telefone_1
+                      )
+                      }}
+                    </strong>
+
+                  </div>
+
+                </div>
+
+
+                <!-- EMAIL -->
+
+                <div class="info-item">
+
+                  <i class="fa-solid fa-envelope"></i>
+
+                  <div>
+
+                    <span>E-mail</span>
+
+                    <strong>
+                      {{
+                      empresa.email ||
+                      'Não informado'
+                      }}
+                    </strong>
+
+                  </div>
+
+                </div>
+
+
+                <!-- PORTE -->
+
+                <div class="info-item">
+
+                  <i class="fa-solid fa-building"></i>
+
+                  <div>
+
+                    <span>Porte</span>
+
+                    <strong>
+                      {{ empresa.porte_descricao }}
+                    </strong>
+
+                  </div>
+
+                </div>
+
+              </div>
+
+
+              <div class="company-address">
+
+                <i class="fa-solid fa-map-location-dot"></i>
+
+                {{ enderecoCompleto(empresa) }}
+
+              </div>
+
+            </div>
+
+          </article>
+
+
+          <!-- ==============================================
+               PAGINAÇÃO
+          =============================================== -->
+
+          <div class="pagination-area">
+
+            <div class="pagination-info">
+
+              Página
+              <strong>{{ pagina }}</strong>
+              de
+              <strong>{{ totalPaginas }}</strong>
+
+            </div>
+
+
+            <div class="pagination">
+
+              <!-- PRIMEIRA -->
+
+              <button type="button" [disabled]="pagina === 1" (click)="mudarPagina(1)" title="Primeira página">
+                <i class="fa-solid fa-angles-left"></i>
+              </button>
+
+
+              <!-- ANTERIOR -->
+
+              <button type="button" [disabled]="pagina === 1" (click)="mudarPagina(pagina - 1)">
+                <i class="fa-solid fa-chevron-left"></i>
+              </button>
+
+
+              <!-- PÁGINAS -->
+
+              <button type="button" *ngFor="let p of paginasVisiveis" [class.active]="p === pagina"
+                (click)="mudarPagina(p)">
+                {{ p }}
+              </button>
+
+
+              <!-- PRÓXIMA -->
+
+              <button type="button" [disabled]="pagina === totalPaginas" (click)="mudarPagina(pagina + 1)">
+                <i class="fa-solid fa-chevron-right"></i>
+              </button>
+
+
+              <!-- ÚLTIMA -->
+
+              <button type="button" [disabled]="pagina === totalPaginas" (click)="mudarPagina(totalPaginas)"
+                title="Última página">
+                <i class="fa-solid fa-angles-right"></i>
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+
+
+        <!-- ================================================
+             PAINEL SELECIONADAS
+        ================================================= -->
+
+        <aside class="selected-panel">
+
+          <div class="selected-panel-header">
+
+            <div>
+
+              <span>
+                EMPRESAS SELECIONADAS
+              </span>
+
+              <strong>
+                {{ quantidadeSelecionadas }}/10
+              </strong>
+
+            </div>
+
+            <button type="button" *ngIf="quantidadeSelecionadas" (click)="limparSelecao()" title="Limpar seleção">
+
+              <i class="fa-solid fa-trash-can"></i>
+
+            </button>
+
+          </div>
+
+
+          <!-- PROGRESSO -->
+
+          <div class="selection-progress">
+
+            <div class="selection-progress-bar" [style.width.%]="percentualSelecao"></div>
+
+          </div>
+
+
+          <!-- VAZIO -->
+
+          <div class="empty-selection" *ngIf="!quantidadeSelecionadas">
+
+            <i class="fa-regular fa-building"></i>
+
+            <strong>
+              Nenhuma empresa selecionada
+            </strong>
+
+            <span>
+              Marque as empresas que deseja incluir
+              no documento de prospecção.
+            </span>
+
+          </div>
+
+
+          <!-- SELECIONADAS -->
+
+          <div class="selected-list" *ngIf="quantidadeSelecionadas">
+
+            <div class="selected-company" *ngFor="
+                let empresa of selecionadas;
+                let i = index
+              ">
+
+              <div class="selected-number">
+                {{ i + 1 }}
+              </div>
+
+
+              <div class="selected-company-info">
+
+                <strong>
+                  {{
+                  empresa.nome_fantasia ||
+                  empresa.razao_social
+                  }}
+                </strong>
+
+                <span>
+                  {{ empresa.municipio }}/CE
+                </span>
+
+                <small>
+                  {{ formatarCnpj(empresa.cnpj) }}
+                </small>
+
+              </div>
+
+
+              <button type="button" (click)="removerSelecionada(empresa.cnpj)">
+
+                <i class="fa-solid fa-xmark"></i>
+
+              </button>
+
+            </div>
+
+          </div>
+
+
+          <!-- GERAR DOCUMENTO -->
+
+          <div class="selected-actions">
+
+            <button type="button" class="btn-document" [disabled]="!quantidadeSelecionadas"
+              (click)="abrirModalContato()">
+              <i class="fa-solid fa-handshake"></i>
+
+              Preparar contato
+            </button>
+
+            <small>
+              O documento será gerado com os dados das
+              empresas selecionadas.
+            </small>
+
+          </div>
+
+        </aside>
+
+      </div>
+
+
+      <!-- ===================================================
+           NENHUM RESULTADO
+      ==================================================== -->
+
+      <div class="empty-result" *ngIf="totalItens === 0">
+
+        <i class="fa-solid fa-magnifying-glass"></i>
+
+        <h3>
+          Nenhuma empresa encontrada
+        </h3>
+
+        <p>
+          Não encontramos empresas ativas para os
+          critérios informados.
+        </p>
+
+      </div>
+
+    </ng-container>
+
+  </div>
+
+</section>
+
+<!-- =====================================================
+     MODAL PREPARAR CONTATO
+===================================================== -->
+
+<div class="contact-modal-backdrop" *ngIf="modalContatoAberto" (click)="fecharModalBackdrop($event)">
+
+  <div class="contact-modal">
+
+    <!-- =================================================
+         CABEÇALHO
+    ================================================== -->
+
+    <div class="contact-modal-header">
+
+      <div>
+
+        <h2>
+          Preparar contato
+        </h2>
+
+        <p>
+          Preencha as informações abaixo para gerar
+          o documento de prospecção.
+        </p>
+
+      </div>
+
+      <button type="button" class="modal-close" (click)="fecharModalContato()" title="Fechar">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+
+    </div>
+
+
+    <!-- =================================================
+         LOGOS
+    ================================================== -->
+
+    <div class="contact-modal-brands">
+
+      <div class="brand-fornece">
+
+        <img src="assets/imgs/logo-fornece-horizontal.png" alt="Programa ForneCE">
+
+      </div>
+
+      <div class="brand-divider"></div>
+
+      <div class="brand-sde">
+
+        <img src="assets/imgs/Logo-SDE---Horizontal.png" alt="Secretaria do Desenvolvimento Econômico do Ceará">
+
+      </div>
+
+    </div>
+
+
+    <!-- =================================================
+         CORPO
+    ================================================== -->
+
+    <div class="contact-modal-body">
+
+      <!-- ===============================================
+           FORMULÁRIO
+      ================================================ -->
+
+      <div class="contact-form-panel">
+
+        <div class="modal-section-title">
+
+          <div class="section-icon">
+            <i class="fa-solid fa-address-card"></i>
+          </div>
+
+          <div>
+            <h3>
+              Informações do contato
+            </h3>
+
+            <span>
+              Dados que serão incluídos no documento.
+            </span>
+          </div>
+
+        </div>
+
+
+        <div class="modal-form-grid">
+
+          <!-- ASSUNTO -->
+
+          <div class="modal-form-group full">
+
+            <label>
+              Assunto da prospecção
+              <span>*</span>
+            </label>
+
+            <input type="text" [(ngModel)]="assuntoProspeccao"
+              placeholder="Ex.: Parceria para fornecimento de serviços">
+
+          </div>
+
+
+          <!-- SERVIÇO -->
+
+          <div class="modal-form-group full">
+
+            <label>
+              Serviço / Projeto
+              <span>*</span>
+            </label>
+
+            <textarea [(ngModel)]="servicoProjeto" maxlength="500" rows="4"
+              placeholder="Descreva o serviço, projeto ou demanda que deseja apresentar às empresas."></textarea>
+
+            <small>
+              {{ servicoProjeto.length }}/500
+            </small>
+
+          </div>
+
+
+          <!-- RESPONSÁVEL -->
+
+          <div class="modal-form-group">
+
+            <label>
+              Responsável pelo contato
+              <span>*</span>
+            </label>
+
+            <input type="text" [(ngModel)]="responsavelContato" placeholder="Nome completo">
+
+          </div>
+
+
+          <!-- CARGO -->
+
+          <div class="modal-form-group">
+
+            <label>
+              Cargo / Função
+            </label>
+
+            <input type="text" [(ngModel)]="cargoFuncao" placeholder="Ex.: Analista, Coordenador, Gerente">
+
+          </div>
+
+
+          <!-- TELEFONE -->
+
+          <div class="modal-form-group">
+
+            <label>
+              Telefone
+            </label>
+
+            <input type="text" [(ngModel)]="telefoneContato" placeholder="(85) 99999-9999">
+
+          </div>
+
+
+          <!-- EMAIL -->
+
+          <div class="modal-form-group">
+
+            <label>
+              E-mail
+              <span>*</span>
+            </label>
+
+            <input type="email" [(ngModel)]="emailContato" placeholder="seu@email.com">
+
+          </div>
+
+
+          <!-- DATA -->
+
+          <div class="modal-form-group">
+
+            <label>
+              Data limite para retorno
+            </label>
+
+            <input type="date" [(ngModel)]="dataLimiteRetorno">
+
+          </div>
+
+
+          <!-- OBSERVAÇÕES -->
+
+          <div class="modal-form-group full">
+
+            <label>
+              Observações
+            </label>
+
+            <textarea [(ngModel)]="observacoesContato" maxlength="500" rows="4"
+              placeholder="Informações adicionais, orientações ou outras observações importantes."></textarea>
+
+            <small>
+              {{ observacoesContato.length }}/500
+            </small>
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+      <!-- ===============================================
+           EMPRESAS SELECIONADAS
+      ================================================ -->
+
+      <div class="modal-companies-panel">
+
+        <div class="modal-section-title">
+
+          <div class="section-icon">
+            <i class="fa-solid fa-building"></i>
+          </div>
+
+          <div>
+
+            <h3>
+              Empresas selecionadas
+            </h3>
+
+            <span>
+              Serão incluídas no documento.
+            </span>
+
+          </div>
+
+          <strong class="modal-company-counter">
+            {{ quantidadeSelecionadas }}/10
+          </strong>
+
+        </div>
+
+
+        <div class="modal-selected-list">
+          <div class="modal-selected-company" *ngFor="
+              let empresa of selecionadas;
+              let i = index
+            ">
+
+            <div class="modal-selected-number">
+              {{ i + 1 }}
+            </div>
+
+
+            <div class="modal-selected-info">
+              <strong>
+                {{ empresa.razao_social }}
+              </strong>
+
+              <span>
+                CNPJ:
+                {{ formatarCnpj(empresa.cnpj) }}
+              </span>
+
+              <small>
+                {{ empresa.municipio }}/{{ empresa.uf }}
+              </small>
+
+            </div>
+
+            <button type="button" (click)="removerSelecionada(empresa.cnpj)" title="Remover">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- =================================================
+         ERRO DO MODAL
+    ================================================== -->
+
+    <div class="modal-alert" *ngIf="mensagemErro">
+      <i class="fa-solid fa-circle-exclamation"></i>
+      {{ mensagemErro }}
+    </div>
+
+
+    <!-- =================================================
+         RODAPÉ
+    ================================================== -->
+
+    <div class="contact-modal-footer">
+      <button type="button" class="btn-modal-cancel" (click)="fecharModalContato()">
+        <i class="fa-solid fa-xmark"></i>
+        Cancelar
+      </button>
+
+
+      <div class="modal-footer-info">
+        <i class="fa-solid fa-circle-info"></i>
+        <span>
+          O documento será gerado com os dados da
+          prospecção e das empresas selecionadas.
+        </span>
+      </div>
+
+
+      <button type="button" class="btn-modal-generate" (click)="gerarDocumentoPeloModal()">
+        <i class="fa-solid fa-file-pdf"></i>
+        Gerar documento (PDF)
+      </button>
+    </div>
+  </div>
+</div>

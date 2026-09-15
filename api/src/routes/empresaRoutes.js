@@ -11,5 +11,6 @@ router.get("/estatisticas/por-cnae", EmpresaControllers.quantidadeEmpresasPorCna
 router.get("/cnae/:cnae", EmpresaControllers.listarEmpresasPorCnae );
 router.get("/listarcnae/cnae", EmpresaControllers.listarCnaes );
 router.get("/listarempresas/ativas", EmpresaControllers.listarEmpresasAtivas );
+router.get("/empresas/pesquisar", EmpresaControllers.pesquisarEmpresas);
 
 module.exports = router;

@@ -23,6 +23,7 @@
     "bootstrap": "^5.3.8",
     "date-fns": "^4.4.0",
     "file-saver": "^2.0.5",
+    "jspdf": "^4.2.1",
     "jwt-decode": "^4.0.0",
     "leaflet": "^1.9.4",
     "ngx-apexcharts": "^0.10.0",

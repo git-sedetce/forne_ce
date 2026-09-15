@@ -1,0 +1,1682 @@
+import { Component, OnInit } from '@angular/core';
+import {
+  EmpresaCnae,
+  EmpresasPorCnaeResponse,
+} from '../../../interfaces/empresa-cnae.interface';
+import { EmpresaService } from '../../../services/empresa.service';
+import { Subject } from 'rxjs';
+import {
+  debounceTime,
+  distinctUntilChanged,
+  finalize,
+  switchMap,
+  tap,
+} from 'rxjs/operators';
+import { jsPDF } from 'jspdf';
+import { MUNICIPIOS_POR_REGIAO } from '../../../data/regioes-ce';
+import { CnaeItem, CnaeResponse } from '../../../interfaces/cnae.interface';
+import { EmpresasPesquisaResponse } from '../../../interfaces/empresa-pesquisa.interface';
+
+@Component({
+  selector: 'app-consulta-empresas',
+  standalone: false,
+  templateUrl: './consulta-empresas.component.html',
+  styleUrl: './consulta-empresas.component.css',
+})
+export class ConsultaEmpresasComponent implements OnInit {
+  // =====================================================
+  // FILTROS
+  // =====================================================
+
+  cnae = '';
+  municipio = '';
+  uf = 'CE';
+
+  empresas: EmpresaCnae[] = [];
+
+  carregando = false;
+  pesquisou = false;
+
+  mensagemErro = '';
+
+  pagina = 1;
+  limite = 20;
+
+  totalItens = 0;
+  totalPaginas = 0;
+
+  cnaeFormatado = '';
+  cnaeDescricao = '';
+  competencia = '';
+
+  regiao = '';
+  porte = '';
+  municipiosFiltrados: string[] = [];
+
+  // =====================================================
+  // ATIVIDADE ECONÔMICA / CNAE
+  // =====================================================
+
+  atividadePesquisa = '';
+  atividadesFiltradas: CnaeItem[] = [];
+  mostrarAtividades = false;
+  carregandoAtividades = false;
+  atividadeSelecionada: CnaeItem | null = null;
+
+  // =====================================================
+  // REGIÕES DO CEARÁ
+  // =====================================================
+
+  readonly regioes: string[] = [
+    'Cariri',
+    'Centro Sul',
+    'Grande Fortaleza',
+    'Litoral Leste',
+    'Litoral Norte',
+    'Litoral Oeste/Vale do Curu',
+    'Maciço do Baturité',
+    'Serra da Ibiapaba',
+    'Sertão Central',
+    'Sertão de Canindé',
+    'Sertão de Sobral',
+    'Sertão do Crateús',
+    'Sertão dos Inhamus',
+    'Vale do Jaguaribe',
+  ];
+
+  readonly municipiosPorRegiao = MUNICIPIOS_POR_REGIAO;
+
+  onRegiaoChange(): void {
+    this.municipio = '';
+
+    if (!this.regiao) {
+      this.municipiosFiltrados = Object.values(this.municipiosPorRegiao)
+        .flat()
+        .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+      return;
+    }
+
+    this.municipiosFiltrados = [
+      ...(this.municipiosPorRegiao[this.regiao] || []),
+    ];
+  }
+
+  // =====================================================
+  // EMPRESAS SELECIONADAS
+  // =====================================================
+
+  empresasSelecionadas = new Map<string, EmpresaCnae>();
+
+  readonly limiteSelecao = 10;
+
+  // =====================================================
+  // MODAL PREPARAR CONTATO
+  // =====================================================
+
+  modalContatoAberto = false;
+  assuntoProspeccao = '';
+  servicoProjeto = '';
+  responsavelContato = '';
+  cargoFuncao = '';
+  telefoneContato = '';
+  emailContato = '';
+  dataLimiteRetorno = '';
+  observacoesContato = '';
+
+  private atividadeSubject = new Subject<string>();
+
+  constructor(private empresaService: EmpresaService) {}
+
+  ngOnInit(): void {
+    this.onRegiaoChange();
+
+    this.atividadeSubject
+      .pipe(
+        debounceTime(350),
+        distinctUntilChanged(),
+
+        tap(() => {
+          this.carregandoAtividades = true;
+        }),
+
+        switchMap((termo) =>
+          this.empresaService.listarCnaes(1, 20, termo).pipe(
+            finalize(() => {
+              this.carregandoAtividades = false;
+            }),
+          ),
+        ),
+      )
+      .subscribe({
+        next: (response) => {
+          this.atividadesFiltradas = response.dados;
+          this.mostrarAtividades = response.dados.length > 0;
+        },
+
+        error: (error) => {
+          console.error('Erro ao pesquisar atividades:', error);
+          this.atividadesFiltradas = [];
+          this.mostrarAtividades = false;
+        },
+      });
+  }
+
+  // =====================================================
+  // CONSULTA
+  // =====================================================
+
+  pesquisar(): void {
+    const cnaeLimpo = this.limparCnae(this.cnae);
+
+    if (cnaeLimpo && cnaeLimpo.length !== 7) {
+      this.mensagemErro = 'O CNAE deve conter 7 números.';
+      return;
+    }
+
+    this.cnae = cnaeLimpo;
+
+    if (!this.cnae && !this.regiao && !this.municipio && !this.porte) {
+      this.mensagemErro =
+        'Informe pelo menos um filtro para realizar a pesquisa.';
+      return;
+    }
+
+    this.mensagemErro = '';
+    this.pagina = 1;
+    this.empresasSelecionadas.clear();
+    this.buscarEmpresas();
+  }
+
+  buscarEmpresas(): void {
+
+  this.carregando = true;
+  this.mensagemErro = '';
+
+  // =====================================================
+  // MUNICÍPIOS DA REGIÃO
+  // =====================================================
+
+  let municipiosRegiao:
+    string[] = [];
+
+
+  /*
+   * Se uma região estiver selecionada e nenhum
+   * município específico estiver selecionado,
+   * enviamos todos os municípios da região.
+   */
+  if (
+    this.regiao &&
+    !this.municipio
+  ) {
+
+    municipiosRegiao = [
+      ...(
+        this.municipiosPorRegiao[
+          this.regiao
+        ] || []
+      )
+    ];
+  }
+
+  // =====================================================
+  // CONSULTA
+  // =====================================================
+
+  this.empresaService
+    .pesquisarEmpresas(
+      this.pagina,
+      this.limite,
+
+      {
+        cnae:
+          this.cnae || undefined,
+
+        uf:
+          this.uf,
+
+        regiao:
+          this.regiao || undefined,
+
+        municipio:
+          this.municipio || undefined,
+
+        porte:
+          this.porte || undefined,
+
+        municipios:
+          municipiosRegiao.length
+            ? municipiosRegiao
+            : undefined,
+      }
+    )
+    .pipe(
+      finalize(() => {
+        this.carregando =
+          false;
+      })
+
+    )
+    .subscribe({
+      // ===================================================
+      // SUCESSO
+      // ===================================================
+
+      next: (
+        response:
+          EmpresasPesquisaResponse
+      ) => {
+        this.pesquisou =
+          true;
+
+        // EMPRESAS
+
+        this.empresas =
+          response.dados;
+
+        // PAGINAÇÃO
+
+        this.pagina =
+          response
+            .paginacao
+            .pagina;
+
+        this.limite =
+          response
+            .paginacao
+            .limite;
+
+        this.totalItens =
+          response
+            .paginacao
+            .total_itens;
+
+        this.totalPaginas =
+          response
+            .paginacao
+            .total_paginas;
+
+        // COMPETÊNCIA
+
+        this.competencia =
+          response
+            .filtros
+            .competencia;
+
+        // CNAE
+
+        this.cnaeFormatado =
+          response
+            .filtros
+            .cnae_formatado || '';
+
+        /*
+         * Se houve CNAE e ainda não temos sua
+         * descrição, utilizamos o resultado.
+         */
+        if (
+          this.cnae &&
+          !this.cnaeDescricao &&
+          response.dados.length
+        ) {
+          this.cnaeDescricao =
+            response
+              .dados[0]
+              .cnae_principal_descricao;
+        }
+
+
+        /*
+         * Quando a pesquisa não utiliza CNAE,
+         * não devemos deixar dados de uma
+         * pesquisa anterior aparecendo.
+         */
+        if (!this.cnae) {
+          this.cnaeFormatado = '';
+          this.cnaeDescricao = '';
+        }
+
+      },
+
+
+      // ===================================================
+      // ERRO
+      // ===================================================
+
+      error: (error) => {
+
+        console.error(
+          'Erro ao consultar empresas:',
+          error
+        );
+
+        this.empresas = [];
+        this.pesquisou =
+          true;
+        this.totalItens = 0;
+        this.totalPaginas = 0;
+        this.mensagemErro =
+          error?.error?.message ||
+          'Não foi possível consultar as empresas.';
+
+      }
+
+    });
+}
+
+  mudarPagina(pagina: number): void {
+    if (pagina < 1 || pagina > this.totalPaginas || pagina === this.pagina) {
+      return;
+    }
+
+    this.pagina = pagina;
+
+    this.buscarEmpresas();
+
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth',
+    });
+  }
+
+  mudarLimite(): void {
+    this.pagina = 1;
+
+    this.buscarEmpresas();
+  }
+
+  limparPesquisa(): void {
+    this.cnae = '';
+    this.atividadePesquisa = '';
+    this.regiao = '';
+    this.municipio = '';
+    this.porte = '';
+    this.uf = 'CE';
+    this.onRegiaoChange();
+    this.atividadesFiltradas = [];
+    this.mostrarAtividades = false;
+    this.empresas = [];
+    this.pagina = 1;
+    this.totalItens = 0;
+    this.totalPaginas = 0;
+    this.cnaeFormatado = '';
+    this.cnaeDescricao = '';
+    this.pesquisou = false;
+    this.empresasSelecionadas.clear();
+    this.fecharModalContato();
+    this.mensagemErro = '';
+  }
+
+  // =====================================================
+  // SELEÇÃO
+  // =====================================================
+
+  selecionarEmpresa(empresa: EmpresaCnae, event: Event): void {
+    const input = event.target as HTMLInputElement;
+
+    if (input.checked) {
+      if (this.empresasSelecionadas.size >= this.limiteSelecao) {
+        input.checked = false;
+
+        this.mensagemErro = `Você pode selecionar no máximo ${this.limiteSelecao} empresas.`;
+
+        return;
+      }
+
+      this.empresasSelecionadas.set(empresa.cnpj, empresa);
+
+      this.mensagemErro = '';
+    } else {
+      this.empresasSelecionadas.delete(empresa.cnpj);
+    }
+  }
+
+  empresaSelecionada(cnpj: string): boolean {
+    return this.empresasSelecionadas.has(cnpj);
+  }
+
+  removerSelecionada(cnpj: string): void {
+    this.empresasSelecionadas.delete(cnpj);
+
+    /*
+     * Se o modal estiver aberto e o usuário
+     * remover todas as empresas, fecha o modal.
+     */
+    if (this.modalContatoAberto && this.quantidadeSelecionadas === 0) {
+      this.fecharModalContato();
+    }
+  }
+
+  limparSelecao(): void {
+    this.empresasSelecionadas.clear();
+
+    this.fecharModalContato();
+  }
+
+  get selecionadas(): EmpresaCnae[] {
+    return Array.from(this.empresasSelecionadas.values());
+  }
+
+  get quantidadeSelecionadas(): number {
+    return this.empresasSelecionadas.size;
+  }
+
+  get percentualSelecao(): number {
+    return (this.quantidadeSelecionadas / this.limiteSelecao) * 100;
+  }
+
+  filtrarAtividades(): void {
+    const termo = this.atividadePesquisa.trim();
+
+    if (
+      this.atividadeSelecionada &&
+      termo !== this.atividadeSelecionada.descricao
+    ) {
+      this.atividadeSelecionada = null;
+      this.cnae = '';
+      this.cnaeFormatado = '';
+      this.cnaeDescricao = '';
+    }
+
+    if (termo.length < 2) {
+      this.atividadesFiltradas = [];
+      this.mostrarAtividades = false;
+
+      return;
+    }
+
+    this.atividadeSubject.next(termo);
+  }
+
+  selecionarAtividade(atividade: CnaeItem): void {
+    this.atividadeSelecionada = atividade;
+    this.cnae = atividade.codigo;
+    this.cnaeFormatado = atividade.codigo_formatado;
+    this.cnaeDescricao = atividade.descricao;
+    this.atividadePesquisa = atividade.descricao;
+    this.atividadesFiltradas = [];
+    this.mostrarAtividades = false;
+  }
+
+  abrirListaAtividades(): void {
+    if (this.atividadePesquisa.trim().length >= 2) {
+      this.filtrarAtividades();
+    }
+  }
+
+  // =====================================================
+  // MODAL
+  // =====================================================
+
+  abrirModalContato(): void {
+    if (!this.quantidadeSelecionadas) {
+      this.mensagemErro =
+        'Selecione pelo menos uma empresa antes de preparar o contato.';
+
+      return;
+    }
+
+    this.mensagemErro = '';
+
+    this.modalContatoAberto = true;
+
+    /*
+     * Evita que o fundo da página continue
+     * rolando enquanto o modal estiver aberto.
+     */
+    document.body.style.overflow = 'hidden';
+  }
+
+  fecharModalContato(): void {
+    this.modalContatoAberto = false;
+
+    document.body.style.overflow = '';
+  }
+
+  fecharModalBackdrop(event: MouseEvent): void {
+    const target = event.target as HTMLElement;
+
+    if (target.classList.contains('contact-modal-backdrop')) {
+      this.fecharModalContato();
+    }
+  }
+
+  validarFormularioContato(): boolean {
+    if (!this.assuntoProspeccao.trim()) {
+      this.mensagemErro = 'Informe o assunto da prospecção.';
+
+      return false;
+    }
+
+    if (!this.servicoProjeto.trim()) {
+      this.mensagemErro = 'Informe o serviço, projeto ou demanda.';
+
+      return false;
+    }
+
+    if (!this.responsavelContato.trim()) {
+      this.mensagemErro = 'Informe o responsável pelo contato.';
+
+      return false;
+    }
+
+    if (!this.emailContato.trim()) {
+      this.mensagemErro = 'Informe o e-mail do responsável pelo contato.';
+
+      return false;
+    }
+
+    if (!this.emailValido(this.emailContato)) {
+      this.mensagemErro = 'Informe um endereço de e-mail válido.';
+
+      return false;
+    }
+
+    this.mensagemErro = '';
+
+    return true;
+  }
+
+  async gerarDocumentoPeloModal(): Promise<void> {
+    if (!this.validarFormularioContato()) {
+      return;
+    }
+    await this.gerarDocumento();
+    this.fecharModalContato();
+  }
+
+  limparFormularioContato(): void {
+    this.assuntoProspeccao = '';
+    this.servicoProjeto = '';
+
+    this.responsavelContato = '';
+    this.cargoFuncao = '';
+
+    this.telefoneContato = '';
+    this.emailContato = '';
+
+    this.dataLimiteRetorno = '';
+
+    this.observacoesContato = '';
+  }
+
+  // =====================================================
+  // PAGINAÇÃO
+  // =====================================================
+
+  get paginasVisiveis(): number[] {
+    if (!this.totalPaginas) {
+      return [];
+    }
+
+    const paginas: number[] = [];
+
+    let inicio = Math.max(this.pagina - 2, 1);
+
+    let fim = Math.min(inicio + 4, this.totalPaginas);
+
+    if (fim - inicio < 4) {
+      inicio = Math.max(fim - 4, 1);
+    }
+
+    for (let pagina = inicio; pagina <= fim; pagina++) {
+      paginas.push(pagina);
+    }
+
+    return paginas;
+  }
+
+  // =====================================================
+  // FORMATAÇÃO
+  // =====================================================
+
+  formatarCnae(valor: string): string {
+    const numeros = this.limparCnae(valor);
+
+    if (numeros.length !== 7) {
+      return valor;
+    }
+
+    return numeros.replace(/^(\d{2})(\d{2})(\d)(\d{2})$/, '$1.$2-$3-$4');
+  }
+
+  formatarCnpj(cnpj: string): string {
+    if (!cnpj) {
+      return '-';
+    }
+
+    const numeros = cnpj.replace(/\D/g, '');
+
+    if (numeros.length !== 14) {
+      return cnpj;
+    }
+
+    return numeros.replace(
+      /^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,
+      '$1.$2.$3/$4-$5',
+    );
+  }
+
+  formatarTelefone(ddd: string | null, telefone: string | null): string {
+    if (!telefone) {
+      return 'Não informado';
+    }
+
+    const numero = telefone.replace(/\D/g, '');
+
+    const dddFormatado = ddd ? `(${ddd}) ` : '';
+
+    if (numero.length === 9) {
+      return dddFormatado + numero.replace(/^(\d{5})(\d{4})$/, '$1-$2');
+    }
+
+    if (numero.length === 8) {
+      return dddFormatado + numero.replace(/^(\d{4})(\d{4})$/, '$1-$2');
+    }
+
+    return dddFormatado + numero;
+  }
+
+  formatarCep(cep: string | null): string {
+    if (!cep) {
+      return '';
+    }
+
+    const numeros = cep.replace(/\D/g, '');
+
+    if (numeros.length !== 8) {
+      return cep;
+    }
+
+    return numeros.replace(/^(\d{5})(\d{3})$/, '$1-$2');
+  }
+
+  formatarDataBrasileira(data: string): string {
+    if (!data) {
+      return 'Não informada';
+    }
+
+    const partes = data.split('-');
+
+    if (partes.length !== 3) {
+      return data;
+    }
+
+    return `${partes[2]}/${partes[1]}/${partes[0]}`;
+  }
+
+  enderecoCompleto(empresa: EmpresaCnae): string {
+    const endereco: string[] = [];
+
+    const logradouro = [empresa.tipo_logradouro, empresa.logradouro]
+      .filter(Boolean)
+      .join(' ');
+
+    if (logradouro) {
+      endereco.push(logradouro);
+    }
+
+    if (empresa.numero) {
+      endereco.push(empresa.numero);
+    }
+
+    if (empresa.complemento) {
+      endereco.push(empresa.complemento);
+    }
+
+    if (empresa.bairro) {
+      endereco.push(empresa.bairro);
+    }
+
+    if (empresa.municipio) {
+      endereco.push(`${empresa.municipio}/${empresa.uf}`);
+    }
+
+    if (empresa.cep) {
+      endereco.push(`CEP ${this.formatarCep(empresa.cep)}`);
+    }
+
+    return endereco.join(', ') || 'Endereço não informado';
+  }
+
+  // =====================================================
+  // PDF
+  // =====================================================
+
+  async gerarDocumento(): Promise<void> {
+    if (!this.quantidadeSelecionadas) {
+      this.mensagemErro =
+        'Selecione pelo menos uma empresa para gerar o documento.';
+
+      return;
+    }
+
+    try {
+      // ===================================================
+      // CARREGAR LOGOS
+      // ===================================================
+
+      const [logoFornece, logoSde] = await Promise.all([
+        this.carregarImagemBase64('assets/imgs/logo-fornece-horizontal.png'),
+
+        this.carregarImagemBase64('assets/imgs/Logo-SDE---Horizontal.png'),
+      ]);
+
+      // ===================================================
+      // CRIAR PDF
+      // ===================================================
+
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      const larguraPagina = doc.internal.pageSize.getWidth();
+
+      const alturaPagina = doc.internal.pageSize.getHeight();
+
+      const margem = 18;
+
+      const larguraConteudo = larguraPagina - margem * 2;
+
+      const dataEmissao = new Intl.DateTimeFormat('pt-BR').format(new Date());
+
+      // ===================================================
+      // PÁGINA 1 - CAPA / RESUMO
+      // ===================================================
+
+      let y = this.adicionarCabecalhoPdf(doc, logoFornece, logoSde);
+
+      // ===================================================
+      // TÍTULO
+      // ===================================================
+
+      y += 5;
+
+      doc.setTextColor(7, 72, 90);
+
+      doc.setFont('helvetica', 'bold');
+
+      doc.setFontSize(19);
+
+      doc.text('DOCUMENTO DE PROSPECÇÃO', larguraPagina / 2, y, {
+        align: 'center',
+      });
+
+      y += 8;
+
+      doc.setFont('helvetica', 'normal');
+
+      doc.setFontSize(10);
+
+      doc.setTextColor(90, 105, 110);
+
+      doc.text('Programa ForneCE', larguraPagina / 2, y, {
+        align: 'center',
+      });
+
+      y += 5;
+
+      doc.setFontSize(8.5);
+
+      doc.text(
+        'Fortalecendo a cadeia produtiva e aproximando empresas e oportunidades no Ceará',
+        larguraPagina / 2,
+        y,
+        {
+          align: 'center',
+        },
+      );
+
+      y += 14;
+
+      // ===================================================
+      // CARD - OBJETO DA PROSPECÇÃO
+      // ===================================================
+
+      const assunto = doc.splitTextToSize(
+        this.assuntoProspeccao,
+        larguraConteudo - 12,
+      );
+
+      const servico = doc.splitTextToSize(
+        this.servicoProjeto,
+        larguraConteudo - 12,
+      );
+
+      const alturaObjeto =
+        20 + assunto.length * 4.5 + servico.length * 4.5 + 12;
+
+      doc.setFillColor(247, 251, 252);
+
+      doc.setDrawColor(214, 226, 229);
+
+      doc.roundedRect(margem, y, larguraConteudo, alturaObjeto, 3, 3, 'FD');
+
+      // título da seção
+
+      doc.setTextColor(7, 88, 107);
+
+      doc.setFont('helvetica', 'bold');
+
+      doc.setFontSize(11);
+
+      doc.text('OBJETO DA PROSPECÇÃO', margem + 6, y + 8);
+
+      let yObjeto = y + 15;
+
+      // assunto
+
+      doc.setTextColor(120, 135, 140);
+
+      doc.setFontSize(7);
+
+      doc.text('ASSUNTO', margem + 6, yObjeto);
+
+      yObjeto += 4;
+
+      doc.setTextColor(40, 60, 66);
+
+      doc.setFont('helvetica', 'bold');
+
+      doc.setFontSize(9);
+
+      doc.text(assunto, margem + 6, yObjeto);
+
+      yObjeto += assunto.length * 4.5;
+
+      yObjeto += 5;
+
+      // serviço / projeto
+
+      doc.setTextColor(120, 135, 140);
+
+      doc.setFont('helvetica', 'bold');
+
+      doc.setFontSize(7);
+
+      doc.text('SERVIÇO / PROJETO / DEMANDA', margem + 6, yObjeto);
+
+      yObjeto += 4;
+
+      doc.setTextColor(45, 63, 68);
+
+      doc.setFont('helvetica', 'normal');
+
+      doc.setFontSize(8.5);
+
+      doc.text(servico, margem + 6, yObjeto);
+
+      y += alturaObjeto + 8;
+
+      // ===================================================
+      // RESPONSÁVEL PELO CONTATO
+      // ===================================================
+
+      doc.setTextColor(7, 72, 90);
+
+      doc.setFont('helvetica', 'bold');
+
+      doc.setFontSize(11);
+
+      doc.text('Responsável pelo contato', margem, y);
+
+      y += 7;
+
+      const larguraColuna = (larguraConteudo - 8) / 2;
+
+      // ---------------------------------------------------
+      // NOME
+      // ---------------------------------------------------
+
+      doc.setTextColor(125, 138, 142);
+
+      doc.setFontSize(7);
+
+      doc.text('RESPONSÁVEL', margem, y);
+
+      doc.text('CARGO / FUNÇÃO', margem + larguraColuna + 8, y);
+
+      y += 4;
+
+      doc.setTextColor(40, 58, 63);
+
+      doc.setFontSize(9);
+
+      doc.text(this.responsavelContato || 'Não informado', margem, y);
+
+      doc.text(
+        this.cargoFuncao || 'Não informado',
+        margem + larguraColuna + 8,
+        y,
+      );
+
+      y += 9;
+
+      // ---------------------------------------------------
+      // TELEFONE / EMAIL
+      // ---------------------------------------------------
+
+      doc.setTextColor(125, 138, 142);
+
+      doc.setFontSize(7);
+
+      doc.text('TELEFONE', margem, y);
+
+      doc.text('E-MAIL', margem + larguraColuna + 8, y);
+
+      y += 4;
+
+      doc.setTextColor(40, 58, 63);
+
+      doc.setFontSize(9);
+
+      doc.text(this.telefoneContato || 'Não informado', margem, y);
+
+      doc.text(
+        this.emailContato || 'Não informado',
+        margem + larguraColuna + 8,
+        y,
+      );
+
+      y += 12;
+
+      // ===================================================
+      // CRITÉRIO DA PROSPECÇÃO
+      // ===================================================
+
+      doc.setFillColor(7, 88, 107);
+
+      doc.roundedRect(margem, y, larguraConteudo, 13, 3, 3, 'F');
+
+      doc.setTextColor(255, 255, 255);
+
+      doc.setFont('helvetica', 'bold');
+
+      doc.setFontSize(10);
+
+      doc.text('CRITÉRIO DA PROSPECÇÃO', margem + 6, y + 8);
+
+      y += 20;
+
+      // ===================================================
+      // CNAE
+      // ===================================================
+
+      doc.setTextColor(120, 135, 140);
+
+      doc.setFontSize(7);
+
+      doc.text('CNAE', margem, y);
+
+      doc.text('EMPRESAS SELECIONADAS', margem + larguraColuna + 8, y);
+
+      y += 4;
+
+      doc.setTextColor(7, 72, 90);
+
+      doc.setFont('helvetica', 'bold');
+
+      doc.setFontSize(11);
+
+      doc.text(this.cnaeFormatado || this.formatarCnae(this.cnae), margem, y);
+
+      doc.setTextColor(238, 110, 44);
+
+      doc.setFontSize(14);
+
+      doc.text(
+        String(this.quantidadeSelecionadas),
+        margem + larguraColuna + 8,
+        y,
+      );
+
+      y += 8;
+
+      // ===================================================
+      // DESCRIÇÃO CNAE
+      // ===================================================
+
+      if (this.cnaeDescricao) {
+        doc.setTextColor(120, 135, 140);
+
+        doc.setFont('helvetica', 'bold');
+
+        doc.setFontSize(7);
+
+        doc.text('ATIVIDADE ECONÔMICA', margem, y);
+
+        y += 4;
+
+        doc.setTextColor(45, 63, 68);
+
+        doc.setFont('helvetica', 'normal');
+
+        doc.setFontSize(8.5);
+
+        const descricaoCnae = doc.splitTextToSize(
+          this.cnaeDescricao,
+          larguraConteudo,
+        );
+
+        doc.text(descricaoCnae, margem, y);
+
+        y += descricaoCnae.length * 4.2;
+
+        y += 6;
+      }
+
+      // ===================================================
+      // DATA LIMITE
+      // ===================================================
+
+      if (this.dataLimiteRetorno) {
+        doc.setTextColor(120, 135, 140);
+
+        doc.setFont('helvetica', 'bold');
+
+        doc.setFontSize(7);
+
+        doc.text('DATA LIMITE PARA RETORNO', margem, y);
+
+        y += 4;
+
+        doc.setTextColor(45, 63, 68);
+
+        doc.setFontSize(9);
+
+        doc.text(
+          this.formatarDataBrasileira(this.dataLimiteRetorno),
+          margem,
+          y,
+        );
+
+        y += 9;
+      }
+
+      // ===================================================
+      // OBSERVAÇÕES
+      // ===================================================
+
+      if (this.observacoesContato.trim()) {
+        doc.setTextColor(120, 135, 140);
+
+        doc.setFont('helvetica', 'bold');
+
+        doc.setFontSize(7);
+
+        doc.text('OBSERVAÇÕES', margem, y);
+
+        y += 4;
+
+        doc.setTextColor(45, 63, 68);
+
+        doc.setFont('helvetica', 'normal');
+
+        doc.setFontSize(8);
+
+        const observacoes = doc.splitTextToSize(
+          this.observacoesContato,
+          larguraConteudo,
+        );
+
+        doc.text(observacoes, margem, y);
+
+        y += observacoes.length * 4;
+
+        y += 6;
+      }
+
+      // ===================================================
+      // EMISSÃO
+      // ===================================================
+
+      doc.setDrawColor(225, 232, 234);
+
+      doc.line(
+        margem,
+        alturaPagina - 34,
+        larguraPagina - margem,
+        alturaPagina - 34,
+      );
+
+      doc.setFont('helvetica', 'normal');
+
+      doc.setFontSize(7.5);
+
+      doc.setTextColor(125, 137, 141);
+
+      doc.text(
+        `Documento gerado em ${dataEmissao}`,
+        larguraPagina / 2,
+        alturaPagina - 27,
+        {
+          align: 'center',
+        },
+      );
+
+      // ===================================================
+      // PÁGINA 2 - EMPRESAS
+      // ===================================================
+
+      doc.addPage();
+
+      y = this.adicionarCabecalhoPdf(doc, logoFornece, logoSde);
+
+      // ===================================================
+      // TÍTULO PÁGINA 2
+      // ===================================================
+
+      doc.setTextColor(7, 72, 90);
+
+      doc.setFont('helvetica', 'bold');
+
+      doc.setFontSize(15);
+
+      doc.text('Empresas selecionadas', margem, y);
+
+      doc.setFont('helvetica', 'normal');
+
+      doc.setFontSize(8.5);
+
+      doc.setTextColor(105, 120, 125);
+
+      doc.text(
+        `${this.quantidadeSelecionadas} empresa${
+          this.quantidadeSelecionadas > 1 ? 's' : ''
+        } selecionada${
+          this.quantidadeSelecionadas > 1 ? 's' : ''
+        } para contato`,
+        margem,
+        y + 6,
+      );
+
+      y += 15;
+
+      // ===================================================
+      // CARDS DAS EMPRESAS
+      // ===================================================
+
+      this.selecionadas.forEach((empresa, index) => {
+        const larguraCard = larguraPagina - margem * 2;
+
+        const padding = 6;
+
+        const larguraConteudo = larguraCard - padding * 2;
+
+        const larguraColuna = (larguraConteudo - 8) / 2;
+
+        // =================================================
+        // PREPARAÇÃO DOS TEXTOS
+        // =================================================
+
+        const razaoSocial = doc.splitTextToSize(
+          empresa.razao_social,
+          larguraCard - 28,
+        );
+
+        const cnpj = this.formatarCnpj(empresa.cnpj);
+
+        const nomeFantasia = empresa.nome_fantasia || 'Não informado';
+
+        const porte = empresa.porte_descricao || 'Não informado';
+
+        const municipio = `${empresa.municipio}/${empresa.uf}`;
+
+        const telefone = this.formatarTelefone(
+          empresa.ddd_1,
+          empresa.telefone_1,
+        );
+
+        const email = empresa.email || 'Não informado';
+
+        const enderecoTexto = this.enderecoCompleto(empresa);
+
+        // =================================================
+        // QUEBRA DOS TEXTOS
+        // =================================================
+
+        const cnpjLinhas = doc.splitTextToSize(cnpj, larguraColuna);
+
+        const fantasiaLinhas = doc.splitTextToSize(nomeFantasia, larguraColuna);
+
+        const porteLinhas = doc.splitTextToSize(porte, larguraColuna);
+
+        const municipioLinhas = doc.splitTextToSize(municipio, larguraColuna);
+
+        const telefoneLinhas = doc.splitTextToSize(telefone, larguraColuna);
+
+        const emailLinhas = doc.splitTextToSize(email, larguraColuna);
+
+        const enderecoLinhas = doc.splitTextToSize(
+          enderecoTexto,
+          larguraConteudo,
+        );
+
+        // =================================================
+        // CÁLCULO DA ALTURA DAS COLUNAS
+        // =================================================
+
+        const alturaCampo = (linhas: string[]): number => {
+          /*
+           * 3.5 = espaço depois do label
+           * 3.6 = altura aproximada de cada linha
+           * 2   = espaço inferior
+           */
+          return 3.5 + linhas.length * 3.6 + 2;
+        };
+
+        const alturaColunaEsquerda =
+          alturaCampo(cnpjLinhas) +
+          alturaCampo(fantasiaLinhas) +
+          alturaCampo(porteLinhas);
+
+        const alturaColunaDireita =
+          alturaCampo(municipioLinhas) +
+          alturaCampo(telefoneLinhas) +
+          alturaCampo(emailLinhas);
+
+        const alturaDados = Math.max(alturaColunaEsquerda, alturaColunaDireita);
+
+        // =================================================
+        // ALTURA DO CARD
+        // =================================================
+
+        /*
+         * 12 = cabeçalho
+         * 6  = distância até dados
+         * alturaDados
+         * 4  = distância da linha do endereço
+         * 3.5 = label ENDEREÇO
+         * endereço
+         * 7 = margem inferior
+         */
+
+        const alturaCard =
+          12 + 6 + alturaDados + 4 + 3.5 + enderecoLinhas.length * 3.6 + 7;
+
+        // =================================================
+        // QUEBRA DE PÁGINA
+        // =================================================
+
+        if (y + alturaCard > alturaPagina - 22) {
+          doc.addPage();
+
+          y = this.adicionarCabecalhoPdf(doc, logoFornece, logoSde);
+
+          /*
+           * Identificação da continuação.
+           */
+          doc.setTextColor(7, 72, 90);
+
+          doc.setFont('helvetica', 'bold');
+
+          doc.setFontSize(11);
+
+          doc.text('Empresas selecionadas — continuação', margem, y);
+
+          y += 9;
+        }
+
+        // =================================================
+        // POSIÇÕES
+        // =================================================
+
+        const xCard = margem;
+        const yCard = y;
+
+        const xConteudo = xCard + padding;
+
+        const colunaEsquerdaX = xConteudo;
+
+        const colunaDireitaX = xConteudo + larguraColuna + 8;
+
+        // =================================================
+        // CARD
+        // =================================================
+
+        doc.setFillColor(249, 252, 252);
+
+        doc.setDrawColor(215, 226, 229);
+
+        doc.setLineWidth(0.3);
+
+        doc.roundedRect(xCard, yCard, larguraCard, alturaCard, 3, 3, 'FD');
+
+        // =================================================
+        // CABEÇALHO DO CARD
+        // =================================================
+
+        doc.setFillColor(7, 88, 107);
+
+        doc.roundedRect(xCard, yCard, larguraCard, 12, 3, 3, 'F');
+
+        /*
+         * Remove o arredondamento inferior
+         * visualmente.
+         */
+        doc.rect(xCard, yCard + 6, larguraCard, 6, 'F');
+
+        // =================================================
+        // NÚMERO
+        // =================================================
+
+        doc.setFillColor(238, 110, 44);
+
+        doc.circle(xCard + 8, yCard + 6, 3.5, 'F');
+
+        doc.setTextColor(255, 255, 255);
+
+        doc.setFont('helvetica', 'bold');
+
+        doc.setFontSize(8);
+
+        doc.text(String(index + 1), xCard + 8, yCard + 7, {
+          align: 'center',
+        });
+
+        // =================================================
+        // RAZÃO SOCIAL
+        // =================================================
+
+        doc.setFontSize(9.5);
+
+        doc.text(razaoSocial, xCard + 14, yCard + 5.5);
+
+        // =================================================
+        // FUNÇÃO AUXILIAR DOS CAMPOS
+        // =================================================
+
+        const escreverCampo = (
+          label: string,
+          linhas: string[],
+          x: number,
+          yCampo: number,
+        ): number => {
+          doc.setTextColor(120, 135, 140);
+
+          doc.setFont('helvetica', 'bold');
+
+          doc.setFontSize(6.8);
+
+          doc.text(label.toUpperCase(), x, yCampo);
+
+          yCampo += 3.5;
+
+          doc.setTextColor(43, 62, 68);
+
+          doc.setFont('helvetica', 'normal');
+
+          doc.setFontSize(8);
+
+          doc.text(linhas, x, yCampo);
+
+          return yCampo + linhas.length * 3.6 + 2;
+        };
+
+        // =================================================
+        // COLUNA ESQUERDA
+        // =================================================
+
+        let yEsquerda = yCard + 18;
+
+        yEsquerda = escreverCampo(
+          'CNPJ',
+          cnpjLinhas,
+          colunaEsquerdaX,
+          yEsquerda,
+        );
+
+        yEsquerda = escreverCampo(
+          'Nome fantasia',
+          fantasiaLinhas,
+          colunaEsquerdaX,
+          yEsquerda,
+        );
+
+        yEsquerda = escreverCampo(
+          'Porte',
+          porteLinhas,
+          colunaEsquerdaX,
+          yEsquerda,
+        );
+
+        // =================================================
+        // COLUNA DIREITA
+        // =================================================
+
+        let yDireita = yCard + 18;
+
+        yDireita = escreverCampo(
+          'Município',
+          municipioLinhas,
+          colunaDireitaX,
+          yDireita,
+        );
+
+        yDireita = escreverCampo(
+          'Telefone',
+          telefoneLinhas,
+          colunaDireitaX,
+          yDireita,
+        );
+
+        yDireita = escreverCampo(
+          'E-mail',
+          emailLinhas,
+          colunaDireitaX,
+          yDireita,
+        );
+
+        // =================================================
+        // DIVISÓRIA
+        // =================================================
+
+        const yEndereco = Math.max(yEsquerda, yDireita);
+
+        doc.setDrawColor(228, 235, 237);
+
+        doc.setLineWidth(0.2);
+
+        doc.line(
+          xConteudo,
+          yEndereco,
+          xCard + larguraCard - padding,
+          yEndereco,
+        );
+
+        // =================================================
+        // ENDEREÇO
+        // =================================================
+
+        let yEnderecoTexto = yEndereco + 4;
+
+        doc.setTextColor(120, 135, 140);
+
+        doc.setFont('helvetica', 'bold');
+
+        doc.setFontSize(6.8);
+
+        doc.text('ENDEREÇO', xConteudo, yEnderecoTexto);
+
+        yEnderecoTexto += 3.5;
+
+        doc.setTextColor(43, 62, 68);
+
+        doc.setFont('helvetica', 'normal');
+
+        doc.setFontSize(8);
+
+        doc.text(enderecoLinhas, xConteudo, yEnderecoTexto);
+
+        // =================================================
+        // PRÓXIMO CARD
+        // =================================================
+
+        y = yCard + alturaCard + 6;
+      });
+
+      // ===================================================
+      // RODAPÉ DE TODAS AS PÁGINAS
+      // ===================================================
+
+      const totalPaginasPdf = doc.getNumberOfPages();
+
+      for (let paginaPdf = 1; paginaPdf <= totalPaginasPdf; paginaPdf++) {
+        // ...
+      }
+
+      // ===================================================
+      // SALVAR
+      // ===================================================
+
+      const data = new Date().toISOString().substring(0, 10);
+
+      doc.save(`prospeccao-fornece-${this.cnae}-${data}.pdf`);
+
+      this.mensagemErro = '';
+    } catch (error) {
+      console.error('Erro ao gerar PDF:', error);
+
+      this.mensagemErro = 'Não foi possível gerar o documento PDF.';
+    }
+  }
+
+  private adicionarCampoPdf(
+    doc: jsPDF,
+    label: string,
+    valor: string,
+    y: number,
+    margem: number,
+    larguraPagina: number,
+  ): number {
+    doc.setFont('helvetica', 'bold');
+
+    doc.text(`${label}:`, margem, y);
+
+    y += 4.5;
+
+    doc.setFont('helvetica', 'normal');
+
+    const linhas = doc.splitTextToSize(
+      valor || 'Não informado',
+      larguraPagina - margem * 2,
+    );
+
+    doc.text(linhas, margem, y);
+
+    y += linhas.length * 4.5;
+
+    y += 2;
+
+    return y;
+  }
+
+  // =====================================================
+  // AUXILIARES
+  // =====================================================
+
+  private limparCnae(valor: string): string {
+    return String(valor || '').replace(/\D/g, '');
+  }
+
+  private emailValido(email: string): boolean {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  }
+
+  /**
+   * Carrega uma imagem existente em assets e devolve
+   * seu conteúdo em Base64 para utilização pelo jsPDF.
+   */
+  private carregarImagemBase64(url: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+
+        const context = canvas.getContext('2d');
+
+        if (!context) {
+          reject(new Error('Não foi possível processar a imagem.'));
+          return;
+        }
+
+        context.drawImage(img, 0, 0);
+
+        resolve(canvas.toDataURL('image/png'));
+      };
+
+      img.onerror = () => {
+        reject(new Error(`Não foi possível carregar a imagem: ${url}`));
+      };
+
+      img.src = url;
+    });
+  }
+
+  /**
+   * Insere o cabeçalho institucional no PDF.
+   */
+  private adicionarCabecalhoPdf(
+    doc: jsPDF,
+    logoFornece: string,
+    logoSde: string,
+  ): number {
+    const larguraPagina = doc.internal.pageSize.getWidth();
+
+    const margem = 15;
+
+    /*
+     * Logo ForneCE
+     *
+     * Mantemos uma área maior porque a imagem
+     * é bastante horizontal.
+     */
+    doc.addImage(logoFornece, 'PNG', margem, 10, 78, 31);
+
+    /*
+     * Separador vertical entre as marcas.
+     */
+    doc.setDrawColor(210, 220, 223);
+
+    doc.setLineWidth(0.3);
+
+    doc.line(101, 12, 101, 39);
+
+    /*
+     * Logo Governo do Ceará / SDE
+     */
+    doc.addImage(logoSde, 'PNG', 108, 11, 86, 30);
+
+    /*
+     * Linha institucional
+     */
+    doc.setDrawColor(7, 88, 107);
+
+    doc.setLineWidth(0.7);
+
+    doc.line(margem, 47, larguraPagina - margem, 47);
+
+    /*
+     * Linha laranja pequena para reforçar
+     * a identidade do ForneCE.
+     */
+    doc.setDrawColor(238, 110, 44);
+
+    doc.setLineWidth(1.2);
+
+    doc.line(margem, 47, 58, 47);
+
+    /*
+     * Retornamos a posição Y onde o conteúdo
+     * pode começar.
+     */
+    return 57;
+  }
+}

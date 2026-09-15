@@ -185,7 +185,7 @@ class UserController {
   static async login(req, res) {
   const { user, password } = req.body;
 
-  console.log("LOGIN:", { user });
+  // console.log("LOGIN:", { user });
 
   try {
     // =====================================================

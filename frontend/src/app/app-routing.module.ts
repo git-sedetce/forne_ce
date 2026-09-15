@@ -7,6 +7,7 @@ import { ResetSenhaComponent } from './components/admin/reset-senha/reset-senha.
 import { ListaUsuariosComponent } from './components/admin/lista-usuarios/lista-usuarios.component';
 import { authGuard } from './services/guards/auth.guard';
 import { roleGuard } from './services/guards/role.guard';
+import { ConsultaEmpresasComponent } from './components/empresa/consulta-empresas/consulta-empresas.component';
 
 const routes: Routes = [
   {
@@ -28,6 +29,12 @@ const routes: Routes = [
   {
     path: 'lista-usuarios',
     component: ListaUsuariosComponent,
+    canActivate: [authGuard, roleGuard],
+    data: { roles: [1] },
+  },
+  {
+    path: 'consulta-empresas',
+    component: ConsultaEmpresasComponent,
     canActivate: [authGuard, roleGuard],
     data: { roles: [1] },
   },

@@ -20,6 +20,7 @@ import { CpfcnpjMaskDirective } from '../directives/cpfcnpj-mask.directive';
 import { CpfCnpjValidacaoDirective } from '../directives/cpfcnpjvalidacao.directive';
 import { ListaUsuariosComponent } from './components/admin/lista-usuarios/lista-usuarios.component';
 import { authInterceptor } from './services/interceptors/auth.interceptor';
+import { ConsultaEmpresasComponent } from './components/empresa/consulta-empresas/consulta-empresas.component';
 
 @NgModule({
   declarations: [
@@ -32,7 +33,8 @@ import { authInterceptor } from './services/interceptors/auth.interceptor';
     ResetSenhaComponent,
     CpfcnpjMaskDirective,
     CpfCnpjValidacaoDirective,
-    ListaUsuariosComponent
+    ListaUsuariosComponent,
+    ConsultaEmpresasComponent
   ],
   imports: [
     BrowserModule,

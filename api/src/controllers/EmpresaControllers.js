@@ -291,9 +291,9 @@ class EmpresaControllers {
         .trim()
         .toUpperCase();
 
-      const page = 10;//Math.max(Number.parseInt(req.query.page, 10) || 1, 1);
+      const page = 10; //Math.max(Number.parseInt(req.query.page, 10) || 1, 1);
 
-      const limit = 10;/*Math.min(
+      const limit = 10; /*Math.min(
         Math.max(Number.parseInt(req.query.limit, 10) || 50, 1),
         100,
       );*/
@@ -555,13 +555,36 @@ class EmpresaControllers {
             END AS tipo_estabelecimento,
 
             est.situacao_cadastral_codigo,
+            CASE
+              WHEN est.situacao_cadastral_codigo = '01'
+                THEN 'NULA'
+              WHEN est.situacao_cadastral_codigo = '02'
+                THEN 'ATIVA'
+              WHEN est.situacao_cadastral_codigo = '03'
+                THEN 'SUSPENSA'
+              WHEN est.situacao_cadastral_codigo = '04'
+                THEN 'INAPTA'
+              WHEN est.situacao_cadastral_codigo = '08'
+                THEN 'BAIXADA'
+              ELSE 'NÃO INFORMADO'
+            END AS situacao_cadastral_descricao,
 
             est.cnae_principal_codigo,
             cnae.descricao AS cnae_principal_descricao,
 
             emp.natureza_juridica_codigo,
             emp.porte_codigo,
-            emp.capital_social,
+            CASE
+              WHEN emp.porte_codigo = '00'
+                THEN 'NÃO INFORMADO'
+              WHEN emp.porte_codigo = '01'
+                THEN 'MICRO EMPRESA'
+              WHEN emp.porte_codigo = '03'
+                THEN 'EMPRESA DE PEQUENO PORTE'
+              WHEN emp.porte_codigo = '05'
+                THEN 'DEMAIS EMPRESAS'
+              ELSE 'NÃO INFORMADO'
+            END AS porte_descricao,
 
             est.tipo_logradouro,
             est.logradouro,
@@ -580,8 +603,7 @@ class EmpresaControllers {
             est.telefone_2,
             est.email,
 
-            est.data_inicio_atividade,
-            est.competencia
+            est.data_inicio_atividade
 
           FROM public.estabelecimentos est
 
@@ -657,77 +679,127 @@ class EmpresaControllers {
    */
   static async listarCnaes(req, res) {
     try {
+      // =====================================================
+      // PARÂMETROS
+      // =====================================================
+
       const pesquisa = String(req.query.pesquisa || "").trim();
 
-      const page = Math.max(Number.parseInt(req.query.page, 10) || 1, 1);
+      const pagina = Math.max(parseInt(req.query.page, 10) || 1, 1);
 
-      const limit = Math.min(
-        Math.max(Number.parseInt(req.query.limit, 10) || 50, 1),
+      const limite = Math.min(
+        Math.max(parseInt(req.query.limit, 10) || 50, 1),
         100,
       );
 
-      const offset = (page - 1) * limit;
+      const offset = (pagina - 1) * limite;
 
-      const pesquisaNumerica = pesquisa.replace(/\D/g, "");
+      // =====================================================
+      // REPLACEMENTS
+      // =====================================================
 
       const replacements = {
-        pesquisa,
-        codigoPesquisa: `${pesquisaNumerica}%`,
-        descricaoPesquisa: `%${pesquisa}%`,
-        limit,
-        offset,
+        limit: limite,
+        offset: offset,
       };
 
-      const filtroPesquisa = `
-      (
-        :pesquisa = ''
-        OR cnae.codigo LIKE :codigoPesquisa
-        OR cnae.descricao ILIKE :descricaoPesquisa
-      )
+      // =====================================================
+      // WHERE DINÂMICO
+      // =====================================================
+
+      let whereSql = "";
+
+      if (pesquisa) {
+        const pesquisaNumerica = pesquisa.replace(/\D/g, "");
+
+        /*
+         * Se o usuário digitou somente números,
+         * pesquisamos também pelo código CNAE.
+         *
+         * A descrição é pesquisada sempre.
+         */
+
+        if (/^[\d.\-/]+$/.test(pesquisa)) {
+          whereSql = `
+          WHERE (
+            cnae.codigo LIKE :codigoPesquisa
+            OR cnae.descricao ILIKE :descricaoPesquisa
+          )
+        `;
+
+          replacements.codigoPesquisa = `%${pesquisaNumerica}%`;
+
+          replacements.descricaoPesquisa = `%${pesquisa}%`;
+        } else {
+          whereSql = `
+          WHERE
+            cnae.descricao ILIKE :descricaoPesquisa
+        `;
+
+          replacements.descricaoPesquisa = `%${pesquisa}%`;
+        }
+      }
+
+      // =====================================================
+      // COUNT
+      // =====================================================
+
+      const countSql = `
+      SELECT
+        COUNT(*)::BIGINT AS total
+
+      FROM public.cnaes cnae
+
+      ${whereSql}
     `;
 
-      const totalResultado = await database.sequelize.query(
-        `
-          SELECT COUNT(*)::BIGINT AS total
-          FROM public.cnaes cnae
-          WHERE ${filtroPesquisa}
-        `,
-        {
-          replacements,
-          type: QueryTypes.SELECT,
-        },
-      );
+      const [countResult] = await database.sequelize.query(countSql, {
+        replacements,
+        type: database.Sequelize.QueryTypes.SELECT,
+      });
 
-      const cnaes = await database.sequelize.query(
-        `
-        SELECT
-          cnae.codigo,
-          cnae.descricao
-        FROM public.cnaes cnae
+      const totalItens = Number(countResult.total);
 
-        WHERE ${filtroPesquisa}
+      // =====================================================
+      // DADOS
+      // =====================================================
 
-        ORDER BY
-          cnae.codigo ASC
+      const dataSql = `
+      SELECT
+        cnae.codigo,
+        cnae.descricao
 
-        LIMIT :limit
-        OFFSET :offset
-      `,
-        {
-          replacements,
-          type: QueryTypes.SELECT,
-        },
-      );
+      FROM public.cnaes cnae
 
-      const totalItens = Number(totalResultado[0]?.total || 0);
+      ${whereSql}
 
-      const dados = cnaes.map((cnae) => ({
-        codigo: cnae.codigo,
+      ORDER BY
+        cnae.codigo
 
-        codigo_formatado: EmpresaControllers.formatarCnae(cnae.codigo),
+      LIMIT :limit
+      OFFSET :offset
+    `;
 
-        descricao: cnae.descricao,
+      const dados = await database.sequelize.query(dataSql, {
+        replacements,
+        type: database.Sequelize.QueryTypes.SELECT,
+      });
+
+      // =====================================================
+      // FORMATAR CNAE
+      // =====================================================
+
+      const dadosFormatados = dados.map((item) => ({
+        codigo: item.codigo,
+
+        codigo_formatado: EmpresaControllers.formatarCnae(item.codigo),
+
+        descricao: item.descricao,
       }));
+
+      // =====================================================
+      // RESPONSE
+      // =====================================================
 
       return res.status(200).json({
         filtros: {
@@ -735,20 +807,21 @@ class EmpresaControllers {
         },
 
         paginacao: {
-          pagina: page,
-          limite: limit,
+          pagina,
+          limite,
+
           total_itens: totalItens,
-          total_paginas: Math.ceil(totalItens / limit),
+
+          total_paginas: Math.ceil(totalItens / limite),
         },
 
-        dados,
+        dados: dadosFormatados,
       });
     } catch (error) {
       console.error("Erro ao listar CNAEs:", error);
 
       return res.status(500).json({
         message: "Erro ao listar CNAEs.",
-        error: error.message,
       });
     }
   }
@@ -909,10 +982,8 @@ class EmpresaControllers {
           SELECT
             est.cnpj_completo AS cnpj,
             est.cnpj_basico,
-
             emp.razao_social,
             est.nome_fantasia,
-
             est.identificador_matriz_filial,
 
             CASE
@@ -922,9 +993,7 @@ class EmpresaControllers {
                 THEN 'FILIAL'
               ELSE 'NÃO INFORMADO'
             END AS tipo_estabelecimento,
-
             est.situacao_cadastral_codigo,
-
             est.cnae_principal_codigo,
             cnae.descricao
               AS cnae_principal_descricao,
@@ -932,24 +1001,20 @@ class EmpresaControllers {
             emp.natureza_juridica_codigo,
             emp.porte_codigo,
             emp.capital_social,
-
             est.tipo_logradouro,
             est.logradouro,
             est.numero,
             est.complemento,
             est.bairro,
             est.cep,
-
             est.uf,
             est.municipio_codigo,
             mun.nome AS municipio,
-
             est.ddd_1,
             est.telefone_1,
             est.ddd_2,
             est.telefone_2,
             est.email,
-
             est.data_inicio_atividade,
             est.competencia
 
@@ -984,7 +1049,6 @@ class EmpresaControllers {
       );
 
       const totalItens = Number(totalResultado[0]?.total || 0);
-
       const dados = empresas.map((empresa) => ({
         ...empresa,
 
@@ -1033,6 +1097,327 @@ class EmpresaControllers {
     }
 
     return codigo.replace(/^(\d{2})(\d{2})(\d)(\d{2})$/, "$1.$2-$3-$4");
+  }
+
+  static async pesquisarEmpresas(req, res) {
+    try {
+      // =====================================================
+      // FILTROS
+      // =====================================================
+
+      const cnae = String(req.query.cnae || "").replace(/\D/g, "");
+      const uf = String(req.query.uf || "CE")
+        .trim()
+        .toUpperCase();
+
+      const municipio = String(req.query.municipio || "").trim();
+      const porte = String(req.query.porte || "").trim();
+      const regiao = String(req.query.regiao || "").trim();
+
+      /*
+       * Municípios pertencentes à região.
+       *
+       * O frontend enviará:
+       * municipios=Fortaleza|Caucaia|Maracanau|...
+       */
+      const municipios = String(req.query.municipios || "")
+        .split("|")
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+      // =====================================================
+      // PAGINAÇÃO
+      // =====================================================
+
+      const page = Math.max(Number.parseInt(req.query.page, 10) || 1, 1);
+
+      const limit = Math.min(
+        Math.max(Number.parseInt(req.query.limit, 10) || 20, 1),
+        100,
+      );
+
+      const offset = (page - 1) * limit;
+
+      // =====================================================
+      // VALIDAÇÕES
+      // =====================================================
+
+      if (cnae && cnae.length !== 7) {
+        return res.status(400).json({
+          message: "O CNAE deve conter exatamente sete números.",
+        });
+      }
+
+      if (!/^[A-Z]{2}$/.test(uf)) {
+        return res.status(400).json({
+          message: "A UF deve conter exatamente duas letras.",
+        });
+      }
+
+      const portesValidos = ["", "00", "01", "03", "05"];
+
+      if (!portesValidos.includes(porte)) {
+        return res.status(400).json({
+          message: "Porte da empresa inválido.",
+        });
+      }
+
+      /*
+       * Evita uma consulta de todas as empresas ativas do Ceará.
+       */
+      if (!cnae && !municipio && !regiao && !porte) {
+        return res.status(400).json({
+          message: "Informe pelo menos um filtro para realizar a pesquisa.",
+        });
+      }
+
+      /*
+       * Se região foi informada e município específico não foi,
+       * precisamos receber a relação de municípios.
+       */
+      if (regiao && !municipio && municipios.length === 0) {
+        return res.status(400).json({
+          message: "Nenhum município foi informado para a região selecionada.",
+        });
+      }
+
+      // =====================================================
+      // COMPETÊNCIA
+      // =====================================================
+
+      const competencia = await EmpresaControllers.obterCompetencia(
+        req.query.competencia,
+      );
+
+      if (!competencia) {
+        return res.status(404).json({
+          message: "Nenhuma competência encontrada.",
+        });
+      }
+
+      // =====================================================
+      // REPLACEMENTS
+      // =====================================================
+
+      const replacements = {
+        uf,
+        competencia,
+        limit,
+        offset,
+      };
+
+      // =====================================================
+      // WHERE DINÂMICO
+      // =====================================================
+
+      const where = [
+        "est.uf = :uf",
+        "est.competencia = :competencia",
+        "est.situacao_cadastral_codigo = '02'",
+      ];
+
+      // CNAE PRINCIPAL
+      if (cnae) {
+        where.push("est.cnae_principal_codigo = :cnae");
+        replacements.cnae = cnae;
+      }
+
+      // MUNICÍPIO ESPECÍFICO
+      if (municipio) {
+        where.push("UPPER(TRIM(mun.nome)) = :municipio");
+        replacements.municipio = municipio.trim().toUpperCase();
+      }
+
+      /*
+       * REGIÃO
+       *
+       * Só aplicamos a lista da região quando nenhum
+       * município específico foi selecionado.
+       */
+      if (regiao && !municipio && municipios.length > 0) {
+        const parametros = [];
+
+        municipios.forEach((nomeMunicipio, index) => {
+          const chave = `municipioRegiao${index}`;
+
+          replacements[chave] = nomeMunicipio;
+
+          parametros.push(`LOWER(TRIM(:${chave}))`);
+        });
+
+        where.push(`LOWER(TRIM(mun.nome)) IN (${parametros.join(", ")})`);
+      }
+
+      // PORTE
+      if (porte) {
+        where.push("emp.porte_codigo = :porte");
+        replacements.porte = porte;
+      }
+
+      const whereSql = where.join("\n AND ");
+
+      // =====================================================
+      // TOTAL
+      // =====================================================
+
+      const totalResultado = await database.sequelize.query(
+        `
+          SELECT
+            COUNT(DISTINCT est.cnpj_completo)::BIGINT AS total
+
+          FROM public.estabelecimentos est
+
+          INNER JOIN public.empresas emp
+            ON emp.id = est.empresa_id
+            AND emp.competencia = est.competencia
+
+          LEFT JOIN public.municipios mun
+            ON mun.codigo = est.municipio_codigo
+
+          WHERE
+            ${whereSql}
+        `,
+        {
+          replacements,
+          type: QueryTypes.SELECT,
+        },
+      );
+
+      // =====================================================
+      // CONSULTA
+      // =====================================================
+
+      const empresas = await database.sequelize.query(
+        `
+          SELECT
+            est.cnpj_completo AS cnpj,
+            est.cnpj_basico,
+            emp.razao_social,
+            est.nome_fantasia,
+            est.identificador_matriz_filial,
+
+            CASE
+              WHEN est.identificador_matriz_filial = '1'
+                THEN 'MATRIZ'
+              WHEN est.identificador_matriz_filial = '2'
+                THEN 'FILIAL'
+              ELSE 'NÃO INFORMADO'
+            END AS tipo_estabelecimento,
+            est.situacao_cadastral_codigo,
+
+            CASE
+              WHEN est.situacao_cadastral_codigo = '01'
+                THEN 'NULA'
+              WHEN est.situacao_cadastral_codigo = '02'
+                THEN 'ATIVA'
+              WHEN est.situacao_cadastral_codigo = '03'
+                THEN 'SUSPENSA'
+              WHEN est.situacao_cadastral_codigo = '04'
+                THEN 'INAPTA'
+              WHEN est.situacao_cadastral_codigo = '08'
+                THEN 'BAIXADA'
+              ELSE 'NÃO INFORMADO'
+            END AS situacao_cadastral_descricao,
+            est.cnae_principal_codigo,
+            cnae.descricao AS cnae_principal_descricao,
+            emp.natureza_juridica_codigo,
+            emp.porte_codigo,
+
+            CASE
+              WHEN emp.porte_codigo = '00'
+                THEN 'NÃO INFORMADO'
+              WHEN emp.porte_codigo = '01'
+                THEN 'MICRO EMPRESA'
+              WHEN emp.porte_codigo = '03'
+                THEN 'EMPRESA DE PEQUENO PORTE'
+              WHEN emp.porte_codigo = '05'
+                THEN 'DEMAIS EMPRESAS'
+              ELSE 'NÃO INFORMADO'
+            END AS porte_descricao,
+
+            est.tipo_logradouro,
+            est.logradouro,
+            est.numero,
+            est.complemento,
+            est.bairro,
+            est.cep,
+            est.uf,
+            est.municipio_codigo,
+            mun.nome AS municipio,
+            est.ddd_1,
+            est.telefone_1,
+            est.ddd_2,
+            est.telefone_2,
+            est.email,
+            est.data_inicio_atividade
+
+          FROM public.estabelecimentos est
+
+          INNER JOIN public.empresas emp
+            ON emp.id = est.empresa_id
+            AND emp.competencia = est.competencia
+
+          INNER JOIN public.cnaes cnae
+            ON cnae.codigo = est.cnae_principal_codigo
+
+          LEFT JOIN public.municipios mun
+            ON mun.codigo = est.municipio_codigo
+
+          WHERE
+            ${whereSql}
+
+          ORDER BY
+            emp.razao_social ASC,
+            est.cnpj_completo ASC
+
+          LIMIT :limit
+          OFFSET :offset
+        `,
+        {
+          replacements,
+          type: QueryTypes.SELECT,
+        },
+      );
+
+      // =====================================================
+      // PAGINAÇÃO
+      // =====================================================
+
+      const totalItens = Number(totalResultado[0]?.total || 0);
+
+      // =====================================================
+      // RESPONSE
+      // =====================================================
+
+      return res.status(200).json({
+        filtros: {
+          cnae: cnae || null,
+          cnae_formatado: cnae ? EmpresaControllers.formatarCnae(cnae) : null,
+          uf,
+          regiao: regiao || null,
+          municipio: municipio || null,
+          porte: porte || null,
+          competencia,
+          situacao_cadastral: "02",
+          criterio_cnae: cnae ? "principal" : null,
+        },
+
+        paginacao: {
+          pagina: page,
+          limite: limit,
+          total_itens: totalItens,
+          total_paginas: Math.ceil(totalItens / limit),
+        },
+
+        dados: empresas,
+      });
+    } catch (error) {
+      console.error("Erro ao pesquisar empresas:", error);
+
+      return res.status(error.status || 500).json({
+        message: error.message || "Erro ao pesquisar empresas.",
+      });
+    }
   }
 }
 
