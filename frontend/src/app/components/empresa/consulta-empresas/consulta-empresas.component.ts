@@ -1,8 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import {
-  EmpresaCnae,
-  EmpresasPorCnaeResponse,
-} from '../../../interfaces/empresa-cnae.interface';
+import { EmpresaCnae } from '../../../interfaces/empresa-cnae.interface';
 import { EmpresaService } from '../../../services/empresa.service';
 import { Subject } from 'rxjs';
 import {
@@ -14,7 +11,7 @@ import {
 } from 'rxjs/operators';
 import { jsPDF } from 'jspdf';
 import { MUNICIPIOS_POR_REGIAO } from '../../../data/regioes-ce';
-import { CnaeItem, CnaeResponse } from '../../../interfaces/cnae.interface';
+import { CnaeItem } from '../../../interfaces/cnae.interface';
 import { EmpresasPesquisaResponse } from '../../../interfaces/empresa-pesquisa.interface';
 
 @Component({
@@ -36,8 +33,11 @@ export class ConsultaEmpresasComponent implements OnInit {
 
   carregando = false;
   pesquisou = false;
+  gerandoDocumento = false;
+  atividadePesquisada = false;
 
   mensagemErro = '';
+  mensagemErroModal = '';
 
   pagina = 1;
   limite = 20;
@@ -52,6 +52,25 @@ export class ConsultaEmpresasComponent implements OnInit {
   regiao = '';
   porte = '';
   municipiosFiltrados: string[] = [];
+
+  readonly portes: Record<string, string> = {
+    '00': 'Não informado',
+    '01': 'Micro Empresa',
+    '03': 'Empresa de Pequeno Porte',
+    '05': 'Demais Empresas',
+  };
+
+  get porteDescricao(): string {
+    return this.porte ? this.portes[this.porte] || this.porte : '';
+  }
+
+  get possuiCnae(): boolean {
+    return !!this.cnae;
+  }
+
+  get possuiFiltrosGeograficos(): boolean {
+    return !!this.regiao || !!this.municipio;
+  }
 
   // =====================================================
   // ATIVIDADE ECONÔMICA / CNAE
@@ -88,6 +107,7 @@ export class ConsultaEmpresasComponent implements OnInit {
 
   onRegiaoChange(): void {
     this.municipio = '';
+    this.mensagemErro = '';
 
     if (!this.regiao) {
       this.municipiosFiltrados = Object.values(this.municipiosPorRegiao)
@@ -138,6 +158,7 @@ export class ConsultaEmpresasComponent implements OnInit {
 
         tap(() => {
           this.carregandoAtividades = true;
+          this.atividadePesquisada = false;
         }),
 
         switchMap((termo) =>
@@ -151,6 +172,7 @@ export class ConsultaEmpresasComponent implements OnInit {
       .subscribe({
         next: (response) => {
           this.atividadesFiltradas = response.dados;
+          this.atividadePesquisada = true;
           this.mostrarAtividades = response.dados.length > 0;
         },
 
@@ -167,245 +189,195 @@ export class ConsultaEmpresasComponent implements OnInit {
   // =====================================================
 
   pesquisar(): void {
+    this.mensagemErro = '';
+
     const cnaeLimpo = this.limparCnae(this.cnae);
 
+    // CNAE é opcional, mas se informado
+    // precisa conter exatamente 7 dígitos.
     if (cnaeLimpo && cnaeLimpo.length !== 7) {
       this.mensagemErro = 'O CNAE deve conter 7 números.';
+
       return;
     }
 
     this.cnae = cnaeLimpo;
 
+    // É obrigatório pelo menos um critério.
     if (!this.cnae && !this.regiao && !this.municipio && !this.porte) {
       this.mensagemErro =
         'Informe pelo menos um filtro para realizar a pesquisa.';
+
       return;
     }
 
-    this.mensagemErro = '';
+    // Nova pesquisa sempre começa na página 1.
     this.pagina = 1;
+
+    // Empresas de uma pesquisa anterior não devem
+    // permanecer selecionadas em uma nova consulta.
     this.empresasSelecionadas.clear();
+
+    // Fecha o autocomplete.
+    this.mostrarAtividades = false;
+    this.atividadesFiltradas = [];
+
     this.buscarEmpresas();
   }
 
   buscarEmpresas(): void {
+    this.carregando = true;
+    this.mensagemErro = '';
 
-  this.carregando = true;
-  this.mensagemErro = '';
+    const municipiosDaRegiao =
+      this.regiao && !this.municipio
+        ? this.municipiosPorRegiao[this.regiao] || []
+        : [];
 
-  // =====================================================
-  // MUNICÍPIOS DA REGIÃO
-  // =====================================================
-
-  let municipiosRegiao:
-    string[] = [];
-
-
-  /*
-   * Se uma região estiver selecionada e nenhum
-   * município específico estiver selecionado,
-   * enviamos todos os municípios da região.
-   */
-  if (
-    this.regiao &&
-    !this.municipio
-  ) {
-
-    municipiosRegiao = [
-      ...(
-        this.municipiosPorRegiao[
-          this.regiao
-        ] || []
+    this.empresaService
+      .pesquisarEmpresas(this.pagina, this.limite, {
+        cnae: this.cnae || undefined,
+        uf: this.uf,
+        regiao: this.regiao || undefined,
+        municipio: this.municipio || undefined,
+        porte: this.porte || undefined,
+        municipios: municipiosDaRegiao,
+      })
+      .pipe(
+        finalize(() => {
+          this.carregando = false;
+        }),
       )
-    ];
+      .subscribe({
+        next: (response: EmpresasPesquisaResponse) => {
+          this.pesquisou = true;
+
+          this.empresas = response.dados;
+          this.pagina = response.paginacao.pagina;
+          this.limite = response.paginacao.limite;
+          this.totalItens = response.paginacao.total_itens;
+          this.totalPaginas = response.paginacao.total_paginas;
+          this.competencia = response.filtros.competencia;
+
+          // ===============================================
+          // CNAE
+          // ===============================================
+
+          if (response.filtros.cnae) {
+            this.cnae = response.filtros.cnae;
+
+            this.cnaeFormatado = response.filtros.cnae_formatado || this.cnae;
+
+            /*
+             * Quando o CNAE foi escolhido pelo autocomplete,
+             * a descrição já estará preenchida.
+             *
+             * Caso tenha sido digitado manualmente, podemos
+             * aproveitar o primeiro resultado.
+             */
+            if (!this.cnaeDescricao && response.dados.length > 0) {
+              this.cnaeDescricao = response.dados[0].cnae_principal_descricao;
+            }
+          } else {
+            this.cnaeFormatado = '';
+            this.cnaeDescricao = '';
+          }
+        },
+
+        error: (error) => {
+          console.error('Erro ao consultar empresas:', error);
+
+          this.empresas = [];
+          this.pesquisou = true;
+
+          this.totalItens = 0;
+          this.totalPaginas = 0;
+
+          this.mensagemErro =
+            error?.error?.message || 'Não foi possível consultar as empresas.';
+        },
+      });
   }
 
-  // =====================================================
-  // CONSULTA
-  // =====================================================
+  empresaPodeSerSelecionada(cnpj: string): boolean {
+    return (
+      this.empresaSelecionada(cnpj) ||
+      this.quantidadeSelecionadas < this.limiteSelecao
+    );
+  }
 
-  this.empresaService
-    .pesquisarEmpresas(
-      this.pagina,
-      this.limite,
-
-      {
-        cnae:
-          this.cnae || undefined,
-
-        uf:
-          this.uf,
-
-        regiao:
-          this.regiao || undefined,
-
-        municipio:
-          this.municipio || undefined,
-
-        porte:
-          this.porte || undefined,
-
-        municipios:
-          municipiosRegiao.length
-            ? municipiosRegiao
-            : undefined,
-      }
-    )
-    .pipe(
-      finalize(() => {
-        this.carregando =
-          false;
-      })
-
-    )
-    .subscribe({
-      // ===================================================
-      // SUCESSO
-      // ===================================================
-
-      next: (
-        response:
-          EmpresasPesquisaResponse
-      ) => {
-        this.pesquisou =
-          true;
-
-        // EMPRESAS
-
-        this.empresas =
-          response.dados;
-
-        // PAGINAÇÃO
-
-        this.pagina =
-          response
-            .paginacao
-            .pagina;
-
-        this.limite =
-          response
-            .paginacao
-            .limite;
-
-        this.totalItens =
-          response
-            .paginacao
-            .total_itens;
-
-        this.totalPaginas =
-          response
-            .paginacao
-            .total_paginas;
-
-        // COMPETÊNCIA
-
-        this.competencia =
-          response
-            .filtros
-            .competencia;
-
-        // CNAE
-
-        this.cnaeFormatado =
-          response
-            .filtros
-            .cnae_formatado || '';
-
-        /*
-         * Se houve CNAE e ainda não temos sua
-         * descrição, utilizamos o resultado.
-         */
-        if (
-          this.cnae &&
-          !this.cnaeDescricao &&
-          response.dados.length
-        ) {
-          this.cnaeDescricao =
-            response
-              .dados[0]
-              .cnae_principal_descricao;
-        }
-
-
-        /*
-         * Quando a pesquisa não utiliza CNAE,
-         * não devemos deixar dados de uma
-         * pesquisa anterior aparecendo.
-         */
-        if (!this.cnae) {
-          this.cnaeFormatado = '';
-          this.cnaeDescricao = '';
-        }
-
-      },
-
-
-      // ===================================================
-      // ERRO
-      // ===================================================
-
-      error: (error) => {
-
-        console.error(
-          'Erro ao consultar empresas:',
-          error
-        );
-
-        this.empresas = [];
-        this.pesquisou =
-          true;
-        this.totalItens = 0;
-        this.totalPaginas = 0;
-        this.mensagemErro =
-          error?.error?.message ||
-          'Não foi possível consultar as empresas.';
-
-      }
-
-    });
-}
-
-  mudarPagina(pagina: number): void {
-    if (pagina < 1 || pagina > this.totalPaginas || pagina === this.pagina) {
+  mudarPagina(novaPagina: number): void {
+    if (
+      novaPagina < 1 ||
+      novaPagina > this.totalPaginas ||
+      novaPagina === this.pagina ||
+      this.carregando
+    ) {
       return;
     }
 
-    this.pagina = pagina;
-
+    this.pagina = novaPagina;
     this.buscarEmpresas();
+  }
 
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth',
-    });
+  trackByEmpresa(index: number, empresa: EmpresaCnae): string {
+    return empresa.cnpj;
   }
 
   mudarLimite(): void {
     this.pagina = 1;
-
     this.buscarEmpresas();
   }
 
   limparPesquisa(): void {
-    this.cnae = '';
-    this.atividadePesquisa = '';
+    // ==========================================
+    // FILTROS
+    // ==========================================
+
+    this.limparFiltroCnae();
     this.regiao = '';
     this.municipio = '';
     this.porte = '';
     this.uf = 'CE';
     this.onRegiaoChange();
-    this.atividadesFiltradas = [];
-    this.mostrarAtividades = false;
+
+    // ==========================================
+    // RESULTADO
+    // ==========================================
+
     this.empresas = [];
+    this.pesquisou = false;
+    this.carregando = false;
     this.pagina = 1;
+    this.limite = 20;
     this.totalItens = 0;
     this.totalPaginas = 0;
+    this.competencia = '';
+
+    // ==========================================
+    // SELEÇÃO
+    // ==========================================
+
+    this.empresasSelecionadas.clear();
+
+    // ==========================================
+    // MENSAGENS
+    // ==========================================
+
+    this.mensagemErro = '';
+  }
+
+  private limparFiltroCnae(): void {
+    this.cnae = '';
     this.cnaeFormatado = '';
     this.cnaeDescricao = '';
-    this.pesquisou = false;
-    this.empresasSelecionadas.clear();
-    this.fecharModalContato();
-    this.mensagemErro = '';
+
+    this.atividadePesquisa = '';
+    this.atividadeSelecionada = null;
+
+    this.atividadesFiltradas = [];
+    this.mostrarAtividades = false;
+    this.carregandoAtividades = false;
   }
 
   // =====================================================
@@ -469,19 +441,25 @@ export class ConsultaEmpresasComponent implements OnInit {
   filtrarAtividades(): void {
     const termo = this.atividadePesquisa.trim();
 
-    if (
-      this.atividadeSelecionada &&
-      termo !== this.atividadeSelecionada.descricao
-    ) {
-      this.atividadeSelecionada = null;
-      this.cnae = '';
-      this.cnaeFormatado = '';
-      this.cnaeDescricao = '';
+    // Se havia uma atividade selecionada e o usuário
+    // começou a editar o texto, a seleção anterior
+    // deixa de ser válida.
+    if (this.atividadeSelecionada) {
+      const textoSelecionado = `${this.atividadeSelecionada.codigo_formatado} - ${this.atividadeSelecionada.descricao}`;
+
+      if (termo !== textoSelecionado) {
+        this.atividadeSelecionada = null;
+
+        this.cnae = '';
+        this.cnaeFormatado = '';
+        this.cnaeDescricao = '';
+      }
     }
 
     if (termo.length < 2) {
       this.atividadesFiltradas = [];
       this.mostrarAtividades = false;
+      this.carregandoAtividades = false;
 
       return;
     }
@@ -494,9 +472,30 @@ export class ConsultaEmpresasComponent implements OnInit {
     this.cnae = atividade.codigo;
     this.cnaeFormatado = atividade.codigo_formatado;
     this.cnaeDescricao = atividade.descricao;
-    this.atividadePesquisa = atividade.descricao;
+    this.atividadePesquisa = `${atividade.codigo_formatado} - ${atividade.descricao}`;
     this.atividadesFiltradas = [];
     this.mostrarAtividades = false;
+    this.mensagemErro = '';
+  }
+
+  onCnaeInput(): void {
+    const cnaeAtual = this.limparCnae(this.cnae);
+
+    if (
+      this.atividadeSelecionada &&
+      cnaeAtual !== this.atividadeSelecionada.codigo
+    ) {
+      this.atividadeSelecionada = null;
+      this.atividadePesquisa = '';
+
+      this.cnaeFormatado = '';
+      this.cnaeDescricao = '';
+
+      this.atividadesFiltradas = [];
+      this.mostrarAtividades = false;
+    }
+
+    this.mensagemErro = '';
   }
 
   abrirListaAtividades(): void {
@@ -512,26 +511,23 @@ export class ConsultaEmpresasComponent implements OnInit {
   abrirModalContato(): void {
     if (!this.quantidadeSelecionadas) {
       this.mensagemErro =
-        'Selecione pelo menos uma empresa antes de preparar o contato.';
+        'Selecione pelo menos uma empresa para preparar o contato.';
 
       return;
     }
 
     this.mensagemErro = '';
-
+    this.mensagemErroModal = '';
     this.modalContatoAberto = true;
-
-    /*
-     * Evita que o fundo da página continue
-     * rolando enquanto o modal estiver aberto.
-     */
-    document.body.style.overflow = 'hidden';
   }
 
   fecharModalContato(): void {
-    this.modalContatoAberto = false;
+    if (this.gerandoDocumento) {
+      return;
+    }
 
-    document.body.style.overflow = '';
+    this.modalContatoAberto = false;
+    this.mensagemErroModal = '';
   }
 
   fecharModalBackdrop(event: MouseEvent): void {
@@ -542,48 +538,115 @@ export class ConsultaEmpresasComponent implements OnInit {
     }
   }
 
-  validarFormularioContato(): boolean {
+  private validarFormularioContato(): boolean {
+    this.mensagemErroModal = '';
+
+    if (!this.quantidadeSelecionadas) {
+      this.mensagemErroModal = 'Selecione pelo menos uma empresa.';
+      return false;
+    }
+
     if (!this.assuntoProspeccao.trim()) {
-      this.mensagemErro = 'Informe o assunto da prospecção.';
+      this.mensagemErroModal = 'Informe o assunto da prospecção.';
 
       return false;
     }
 
     if (!this.servicoProjeto.trim()) {
-      this.mensagemErro = 'Informe o serviço, projeto ou demanda.';
+      this.mensagemErroModal = 'Informe o serviço, projeto ou demanda.';
 
       return false;
     }
 
     if (!this.responsavelContato.trim()) {
-      this.mensagemErro = 'Informe o responsável pelo contato.';
+      this.mensagemErroModal = 'Informe o responsável pelo contato.';
 
       return false;
     }
 
     if (!this.emailContato.trim()) {
-      this.mensagemErro = 'Informe o e-mail do responsável pelo contato.';
+      this.mensagemErroModal = 'Informe o e-mail para contato.';
 
       return false;
     }
 
     if (!this.emailValido(this.emailContato)) {
-      this.mensagemErro = 'Informe um endereço de e-mail válido.';
+      this.mensagemErroModal = 'Informe um e-mail válido.';
 
       return false;
     }
 
-    this.mensagemErro = '';
-
     return true;
   }
 
+  private obterCriteriosConsulta(): Array<{
+    label: string;
+    valor: string;
+    descricao?: string;
+  }> {
+    const criterios: Array<{
+      label: string;
+      valor: string;
+      descricao?: string;
+    }> = [];
+
+    // CNAE / ATIVIDADE ECONÔMICA
+    if (this.cnae) {
+      criterios.push({
+        label: 'CNAE',
+        valor: this.cnaeFormatado || this.formatarCnae(this.cnae),
+        descricao: this.cnaeDescricao || undefined,
+      });
+    }
+
+    // REGIÃO
+    if (this.regiao) {
+      criterios.push({
+        label: 'Região',
+        valor: this.regiao,
+      });
+    }
+
+    // MUNICÍPIO
+    if (this.municipio) {
+      criterios.push({
+        label: 'Município',
+        valor: `${this.municipio}/${this.uf}`,
+      });
+    }
+
+    // PORTE
+    if (this.porte) {
+      criterios.push({
+        label: 'Porte',
+        valor: this.porteDescricao || this.porte,
+      });
+    }
+
+    return criterios;
+  }
+
   async gerarDocumentoPeloModal(): Promise<void> {
+    if (this.gerandoDocumento) {
+      return;
+    }
+
     if (!this.validarFormularioContato()) {
       return;
     }
-    await this.gerarDocumento();
-    this.fecharModalContato();
+
+    this.gerandoDocumento = true;
+    this.mensagemErroModal = '';
+
+    try {
+      const gerado = await this.gerarDocumento();
+
+      if (gerado) {
+        this.fecharModalContato();
+      }
+    } finally {
+      this.gerandoDocumento = false;
+    }
   }
 
   limparFormularioContato(): void {
@@ -744,12 +807,12 @@ export class ConsultaEmpresasComponent implements OnInit {
   // PDF
   // =====================================================
 
-  async gerarDocumento(): Promise<void> {
+  async gerarDocumento(): Promise<boolean> {
     if (!this.quantidadeSelecionadas) {
-      this.mensagemErro =
+      this.mensagemErroModal =
         'Selecione pelo menos uma empresa para gerar o documento.';
 
-      return;
+      return false;
     }
 
     try {
@@ -759,7 +822,6 @@ export class ConsultaEmpresasComponent implements OnInit {
 
       const [logoFornece, logoSde] = await Promise.all([
         this.carregarImagemBase64('assets/imgs/logo-fornece-horizontal.png'),
-
         this.carregarImagemBase64('assets/imgs/Logo-SDE---Horizontal.png'),
       ]);
 
@@ -774,14 +836,11 @@ export class ConsultaEmpresasComponent implements OnInit {
       });
 
       const larguraPagina = doc.internal.pageSize.getWidth();
-
       const alturaPagina = doc.internal.pageSize.getHeight();
-
       const margem = 18;
-
       const larguraConteudo = larguraPagina - margem * 2;
-
       const dataEmissao = new Intl.DateTimeFormat('pt-BR').format(new Date());
+      const criteriosConsulta = this.obterCriteriosConsulta();
 
       // ===================================================
       // PÁGINA 1 - CAPA / RESUMO
@@ -796,11 +855,8 @@ export class ConsultaEmpresasComponent implements OnInit {
       y += 5;
 
       doc.setTextColor(7, 72, 90);
-
       doc.setFont('helvetica', 'bold');
-
       doc.setFontSize(19);
-
       doc.text('DOCUMENTO DE PROSPECÇÃO', larguraPagina / 2, y, {
         align: 'center',
       });
@@ -808,11 +864,8 @@ export class ConsultaEmpresasComponent implements OnInit {
       y += 8;
 
       doc.setFont('helvetica', 'normal');
-
       doc.setFontSize(10);
-
       doc.setTextColor(90, 105, 110);
-
       doc.text('Programa ForneCE', larguraPagina / 2, y, {
         align: 'center',
       });
@@ -820,7 +873,6 @@ export class ConsultaEmpresasComponent implements OnInit {
       y += 5;
 
       doc.setFontSize(8.5);
-
       doc.text(
         'Fortalecendo a cadeia produtiva e aproximando empresas e oportunidades no Ceará',
         larguraPagina / 2,
@@ -850,65 +902,37 @@ export class ConsultaEmpresasComponent implements OnInit {
         20 + assunto.length * 4.5 + servico.length * 4.5 + 12;
 
       doc.setFillColor(247, 251, 252);
-
       doc.setDrawColor(214, 226, 229);
-
       doc.roundedRect(margem, y, larguraConteudo, alturaObjeto, 3, 3, 'FD');
 
       // título da seção
 
       doc.setTextColor(7, 88, 107);
-
       doc.setFont('helvetica', 'bold');
-
       doc.setFontSize(11);
-
       doc.text('OBJETO DA PROSPECÇÃO', margem + 6, y + 8);
-
       let yObjeto = y + 15;
-
       // assunto
-
       doc.setTextColor(120, 135, 140);
-
       doc.setFontSize(7);
-
       doc.text('ASSUNTO', margem + 6, yObjeto);
-
       yObjeto += 4;
-
       doc.setTextColor(40, 60, 66);
-
       doc.setFont('helvetica', 'bold');
-
       doc.setFontSize(9);
-
       doc.text(assunto, margem + 6, yObjeto);
-
       yObjeto += assunto.length * 4.5;
-
       yObjeto += 5;
-
       // serviço / projeto
-
       doc.setTextColor(120, 135, 140);
-
       doc.setFont('helvetica', 'bold');
-
       doc.setFontSize(7);
-
       doc.text('SERVIÇO / PROJETO / DEMANDA', margem + 6, yObjeto);
-
       yObjeto += 4;
-
       doc.setTextColor(45, 63, 68);
-
       doc.setFont('helvetica', 'normal');
-
       doc.setFontSize(8.5);
-
       doc.text(servico, margem + 6, yObjeto);
-
       y += alturaObjeto + 8;
 
       // ===================================================
@@ -916,15 +940,10 @@ export class ConsultaEmpresasComponent implements OnInit {
       // ===================================================
 
       doc.setTextColor(7, 72, 90);
-
       doc.setFont('helvetica', 'bold');
-
       doc.setFontSize(11);
-
       doc.text('Responsável pelo contato', margem, y);
-
       y += 7;
-
       const larguraColuna = (larguraConteudo - 8) / 2;
 
       // ---------------------------------------------------
@@ -932,21 +951,13 @@ export class ConsultaEmpresasComponent implements OnInit {
       // ---------------------------------------------------
 
       doc.setTextColor(125, 138, 142);
-
       doc.setFontSize(7);
-
       doc.text('RESPONSÁVEL', margem, y);
-
       doc.text('CARGO / FUNÇÃO', margem + larguraColuna + 8, y);
-
       y += 4;
-
       doc.setTextColor(40, 58, 63);
-
       doc.setFontSize(9);
-
       doc.text(this.responsavelContato || 'Não informado', margem, y);
-
       doc.text(
         this.cargoFuncao || 'Não informado',
         margem + larguraColuna + 8,
@@ -960,21 +971,13 @@ export class ConsultaEmpresasComponent implements OnInit {
       // ---------------------------------------------------
 
       doc.setTextColor(125, 138, 142);
-
       doc.setFontSize(7);
-
       doc.text('TELEFONE', margem, y);
-
       doc.text('E-MAIL', margem + larguraColuna + 8, y);
-
       y += 4;
-
       doc.setTextColor(40, 58, 63);
-
       doc.setFontSize(9);
-
-      doc.text(this.telefoneContato || 'Não informado', margem, y);
-
+      doc.text(this.telefoneContatoFormatado(), margem, y);
       doc.text(
         this.emailContato || 'Não informado',
         margem + larguraColuna + 8,
@@ -984,88 +987,97 @@ export class ConsultaEmpresasComponent implements OnInit {
       y += 12;
 
       // ===================================================
-      // CRITÉRIO DA PROSPECÇÃO
+      // CRITÉRIOS DA PROSPECÇÃO
       // ===================================================
 
       doc.setFillColor(7, 88, 107);
-
       doc.roundedRect(margem, y, larguraConteudo, 13, 3, 3, 'F');
-
       doc.setTextColor(255, 255, 255);
-
       doc.setFont('helvetica', 'bold');
-
       doc.setFontSize(10);
-
-      doc.text('CRITÉRIO DA PROSPECÇÃO', margem + 6, y + 8);
-
+      doc.text('CRITÉRIOS DA PROSPECÇÃO', margem + 6, y + 8);
       y += 20;
 
       // ===================================================
-      // CNAE
+      // EMPRESAS SELECIONADAS
       // ===================================================
 
       doc.setTextColor(120, 135, 140);
-
-      doc.setFontSize(7);
-
-      doc.text('CNAE', margem, y);
-
-      doc.text('EMPRESAS SELECIONADAS', margem + larguraColuna + 8, y);
-
-      y += 4;
-
-      doc.setTextColor(7, 72, 90);
-
       doc.setFont('helvetica', 'bold');
-
-      doc.setFontSize(11);
-
-      doc.text(this.cnaeFormatado || this.formatarCnae(this.cnae), margem, y);
-
+      doc.setFontSize(7);
+      doc.text('EMPRESAS SELECIONADAS', margem, y);
+      y += 5;
       doc.setTextColor(238, 110, 44);
+      doc.setFontSize(15);
+      doc.text(String(this.quantidadeSelecionadas), margem, y);
 
-      doc.setFontSize(14);
-
-      doc.text(
-        String(this.quantidadeSelecionadas),
-        margem + larguraColuna + 8,
-        y,
-      );
-
-      y += 8;
+      y += 10;
 
       // ===================================================
-      // DESCRIÇÃO CNAE
+      // FILTROS UTILIZADOS
       // ===================================================
 
-      if (this.cnaeDescricao) {
+      criteriosConsulta.forEach((criterio) => {
+        // -----------------------------------------------
+        // LABEL
+        // -----------------------------------------------
+
         doc.setTextColor(120, 135, 140);
-
         doc.setFont('helvetica', 'bold');
-
         doc.setFontSize(7);
-
-        doc.text('ATIVIDADE ECONÔMICA', margem, y);
-
+        doc.text(criterio.label.toUpperCase(), margem, y);
         y += 4;
 
-        doc.setTextColor(45, 63, 68);
+        // -----------------------------------------------
+        // VALOR
+        // -----------------------------------------------
 
-        doc.setFont('helvetica', 'normal');
-
-        doc.setFontSize(8.5);
-
-        const descricaoCnae = doc.splitTextToSize(
-          this.cnaeDescricao,
+        doc.setTextColor(7, 72, 90);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        const valorLinhas = doc.splitTextToSize(
+          criterio.valor,
           larguraConteudo,
         );
 
-        doc.text(descricaoCnae, margem, y);
+        doc.text(valorLinhas, margem, y);
+        y += valorLinhas.length * 4;
 
-        y += descricaoCnae.length * 4.2;
+        // -----------------------------------------------
+        // DESCRIÇÃO OPCIONAL
+        // -----------------------------------------------
 
-        y += 6;
+        if (criterio.descricao) {
+          y += 1;
+          doc.setTextColor(75, 92, 97);
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(8);
+
+          const descricaoLinhas = doc.splitTextToSize(
+            criterio.descricao,
+            larguraConteudo,
+          );
+
+          doc.text(descricaoLinhas, margem, y);
+          y += descricaoLinhas.length * 3.8;
+        }
+
+        y += 5;
+      });
+
+      // ===================================================
+      // VERIFICAR ESPAÇO DA PÁGINA
+      // ===================================================
+
+      if (y > alturaPagina - 70) {
+        doc.addPage();
+
+        y = this.adicionarCabecalhoPdf(doc, logoFornece, logoSde);
+        doc.setTextColor(7, 72, 90);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.text('Informações da prospecção — continuação', margem, y);
+        y += 10;
       }
 
       // ===================================================
@@ -1074,19 +1086,12 @@ export class ConsultaEmpresasComponent implements OnInit {
 
       if (this.dataLimiteRetorno) {
         doc.setTextColor(120, 135, 140);
-
         doc.setFont('helvetica', 'bold');
-
         doc.setFontSize(7);
-
         doc.text('DATA LIMITE PARA RETORNO', margem, y);
-
         y += 4;
-
         doc.setTextColor(45, 63, 68);
-
         doc.setFontSize(9);
-
         doc.text(
           this.formatarDataBrasileira(this.dataLimiteRetorno),
           margem,
@@ -1102,19 +1107,12 @@ export class ConsultaEmpresasComponent implements OnInit {
 
       if (this.observacoesContato.trim()) {
         doc.setTextColor(120, 135, 140);
-
         doc.setFont('helvetica', 'bold');
-
         doc.setFontSize(7);
-
         doc.text('OBSERVAÇÕES', margem, y);
-
         y += 4;
-
         doc.setTextColor(45, 63, 68);
-
         doc.setFont('helvetica', 'normal');
-
         doc.setFontSize(8);
 
         const observacoes = doc.splitTextToSize(
@@ -1122,10 +1120,24 @@ export class ConsultaEmpresasComponent implements OnInit {
           larguraConteudo,
         );
 
+        const alturaObservacoes = observacoes.length * 4 + 12;
+
+        if (y + alturaObservacoes > alturaPagina - 30) {
+          doc.addPage();
+          y = this.adicionarCabecalhoPdf(doc, logoFornece, logoSde);
+          doc.setTextColor(7, 72, 90);
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(11);
+          doc.text('Informações da prospecção — continuação', margem, y);
+          y += 10;
+          doc.setTextColor(120, 135, 140);
+          doc.setFontSize(7);
+          doc.text('OBSERVAÇÕES', margem, y);
+          y += 4;
+        }
+
         doc.text(observacoes, margem, y);
-
         y += observacoes.length * 4;
-
         y += 6;
       }
 
@@ -1532,16 +1544,54 @@ export class ConsultaEmpresasComponent implements OnInit {
       // SALVAR
       // ===================================================
 
-      const data = new Date().toISOString().substring(0, 10);
-
-      doc.save(`prospeccao-fornece-${this.cnae}-${data}.pdf`);
-
-      this.mensagemErro = '';
+      const data = this.dataArquivoAtual();
+      const identificador = this.gerarIdentificadorArquivoPdf();
+      doc.save(`prospeccao-fornece-${identificador}-${data}.pdf`);
+      this.mensagemErroModal = '';
+      return true;
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
-
-      this.mensagemErro = 'Não foi possível gerar o documento PDF.';
+      this.mensagemErroModal =
+        'Não foi possível gerar o documento PDF. Tente novamente.';
+      return false;
     }
+  }
+
+  private dataArquivoAtual(): string {
+    const agora = new Date();
+    const ano = agora.getFullYear();
+    const mes = String(agora.getMonth() + 1).padStart(2, '0');
+    const dia = String(agora.getDate()).padStart(2, '0');
+    return `${ano}-${mes}-${dia}`;
+  }
+
+  private gerarIdentificadorArquivoPdf(): string {
+    if (this.cnae) {
+      return `cnae-${this.cnae}`;
+    }
+
+    if (this.municipio) {
+      return `municipio-${this.normalizarNomeArquivo(this.municipio)}`;
+    }
+
+    if (this.regiao) {
+      return `regiao-${this.normalizarNomeArquivo(this.regiao)}`;
+    }
+
+    if (this.porte) {
+      return `porte-${this.porte}`;
+    }
+
+    return 'consulta';
+  }
+
+  private normalizarNomeArquivo(valor: string): string {
+    return valor
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
   }
 
   private adicionarCampoPdf(
@@ -1583,7 +1633,27 @@ export class ConsultaEmpresasComponent implements OnInit {
   }
 
   private emailValido(email: string): boolean {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+    const emailNormalizado = email.trim();
+
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNormalizado);
+  }
+
+  private telefoneContatoFormatado(): string {
+    const telefone = this.telefoneContato.replace(/\D/g, '');
+
+    if (!telefone) {
+      return 'Não informado';
+    }
+
+    if (telefone.length === 11) {
+      return telefone.replace(/^(\d{2})(\d{5})(\d{4})$/, '($1) $2-$3');
+    }
+
+    if (telefone.length === 10) {
+      return telefone.replace(/^(\d{2})(\d{4})(\d{4})$/, '($1) $2-$3');
+    }
+
+    return this.telefoneContato.trim();
   }
 
   /**
