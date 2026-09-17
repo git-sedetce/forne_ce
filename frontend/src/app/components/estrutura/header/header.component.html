@@ -10,7 +10,7 @@
     <!-- LOGOMARCA -->
 
     <a class="brand" routerLink="/" aria-label="Ir para a página inicial" (click)="fecharMenu()">
-      <img src="assets/imgs/logo-fornece-horizontal.png" alt="Programa ForneCE" />
+      <img *ngIf="exibirLogosInstitucionais" src="assets/imgs/logo-fornece-horizontal.png" alt="Programa ForneCE" />
     </a>
 
     <!-- BOTÃO MOBILE -->

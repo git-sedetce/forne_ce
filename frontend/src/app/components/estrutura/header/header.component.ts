@@ -30,6 +30,16 @@ export class HeaderComponent implements OnInit {
     });
   }
 
+  get exibirLogosInstitucionais(): boolean {
+    const hoje = new Date();
+    const dataExibicao = new Date(2026, 10, 1);
+
+    hoje.setHours(0, 0, 0, 0);
+    dataExibicao.setHours(0, 0, 0, 0);
+
+    return hoje >= dataExibicao;
+  }
+
   alternarMenu(): void {
     this.menuAberto = !this.menuAberto;
   }

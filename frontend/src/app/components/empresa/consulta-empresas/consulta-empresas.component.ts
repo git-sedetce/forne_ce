@@ -144,6 +144,16 @@ export class ConsultaEmpresasComponent implements OnInit {
   dataLimiteRetorno = '';
   observacoesContato = '';
 
+  get exibirLogosInstitucionais(): boolean {
+    const hoje = new Date();
+    const dataExibicao = new Date(2026, 10, 1);
+
+    hoje.setHours(0, 0, 0, 0);
+    dataExibicao.setHours(0, 0, 0, 0);
+
+    return hoje >= dataExibicao;
+  }
+
   private atividadeSubject = new Subject<string>();
 
   constructor(private empresaService: EmpresaService) {}
@@ -820,10 +830,12 @@ export class ConsultaEmpresasComponent implements OnInit {
       // CARREGAR LOGOS
       // ===================================================
 
-      const [logoFornece, logoSde] = await Promise.all([
-        this.carregarImagemBase64('assets/imgs/logo-fornece-horizontal.png'),
-        this.carregarImagemBase64('assets/imgs/Logo-SDE---Horizontal.png'),
-      ]);
+      const [logoFornece, logoSde] = this.exibirLogosInstitucionais
+        ? await Promise.all([
+            this.carregarImagemBase64('assets/imgs/logo-fornece-horizontal.png'),
+            this.carregarImagemBase64('assets/imgs/Logo-SDE---Horizontal.png'),
+          ])
+        : [null, null];
 
       // ===================================================
       // CRIAR PDF
@@ -1695,8 +1707,8 @@ export class ConsultaEmpresasComponent implements OnInit {
    */
   private adicionarCabecalhoPdf(
     doc: jsPDF,
-    logoFornece: string,
-    logoSde: string,
+    logoFornece: string | null,
+    logoSde: string | null,
   ): number {
     const larguraPagina = doc.internal.pageSize.getWidth();
 
@@ -1708,21 +1720,23 @@ export class ConsultaEmpresasComponent implements OnInit {
      * Mantemos uma área maior porque a imagem
      * é bastante horizontal.
      */
-    doc.addImage(logoFornece, 'PNG', margem, 10, 78, 31);
+    if (logoFornece && logoSde) {
+      doc.addImage(logoFornece, 'PNG', margem, 10, 78, 31);
 
     /*
      * Separador vertical entre as marcas.
      */
-    doc.setDrawColor(210, 220, 223);
+      doc.setDrawColor(210, 220, 223);
 
-    doc.setLineWidth(0.3);
+      doc.setLineWidth(0.3);
 
-    doc.line(101, 12, 101, 39);
+      doc.line(101, 12, 101, 39);
 
     /*
      * Logo Governo do Ceará / SDE
      */
-    doc.addImage(logoSde, 'PNG', 108, 11, 86, 30);
+      doc.addImage(logoSde, 'PNG', 108, 11, 86, 30);
+    }
 
     /*
      * Linha institucional
