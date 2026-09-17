@@ -254,3 +254,32 @@ CREATE INDEX IF NOT EXISTS idx_simples_opcao_mei
 ON public.simples (
     opcao_mei
 );
+
+-- =====================================================================
+-- COCIENTE LOCACIONAL
+-- =====================================================================
+
+CREATE INDEX IF NOT EXISTS
+    idx_cociente_competencia_cnae_ql
+ON analytics.cociente_locacional (
+    competencia,
+    cnae_codigo,
+    cociente_locacional DESC
+);
+
+
+CREATE INDEX IF NOT EXISTS
+    idx_cociente_competencia_municipio_ql
+ON analytics.cociente_locacional (
+    competencia,
+    municipio_codigo,
+    cociente_locacional DESC
+);
+
+
+CREATE INDEX IF NOT EXISTS
+    idx_cociente_competencia_ql
+ON analytics.cociente_locacional (
+    competencia,
+    cociente_locacional DESC
+);

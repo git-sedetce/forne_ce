@@ -19,63 +19,38 @@ TIPO_CARGA = "COCIENTE_LOCACIONAL"
 
 def validar_estrutura(conn):
     """
-    Valida se a estrutura necessária para o cálculo existe.
+    Valida se as tabelas necessárias para o cálculo existem.
     """
+
+    tabelas = [
+        ("public", "estabelecimentos"),
+        ("public", "municipios"),
+        ("public", "cnaes"),
+        ("analytics", "cociente_locacional"),
+    ]
 
     with conn.cursor() as cur:
 
-        # ----------------------------------------------------
-        # TABELA DE ESTABELECIMENTOS
-        # ----------------------------------------------------
+        for schema, tabela in tabelas:
 
-        cur.execute(
-            """
-            SELECT EXISTS (
-
-                SELECT 1
-
-                FROM information_schema.tables
-
-                WHERE table_schema = 'public'
-
-                  AND table_name = 'estabelecimentos'
-            )
-            """
-        )
-
-        if not cur.fetchone()[0]:
-
-            raise RuntimeError(
-                "Tabela public.estabelecimentos "
-                "não encontrada."
+            cur.execute(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM information_schema.tables
+                    WHERE table_schema = %s
+                      AND table_name = %s
+                )
+                """,
+                (schema, tabela),
             )
 
-        # ----------------------------------------------------
-        # TABELA ANALYTICS
-        # ----------------------------------------------------
+            if not cur.fetchone()[0]:
 
-        cur.execute(
-            """
-            SELECT EXISTS (
-
-                SELECT 1
-
-                FROM information_schema.tables
-
-                WHERE table_schema = 'analytics'
-
-                  AND table_name = 'cociente_locacional'
-            )
-            """
-        )
-
-        if not cur.fetchone()[0]:
-
-            raise RuntimeError(
-                "Tabela analytics.cociente_locacional "
-                "não encontrada. Atualize o "
-                "001_schema.sql."
-            )
+                raise RuntimeError(
+                    f"Tabela {schema}.{tabela} "
+                    "não encontrada."
+                )
 
 
 # ============================================================
@@ -84,8 +59,7 @@ def validar_estrutura(conn):
 
 def validar_dados(conn, competencia):
     """
-    Verifica se existem estabelecimentos da competência
-    antes do cálculo.
+    Verifica se existem estabelecimentos da competência.
     """
 
     with conn.cursor() as cur:
@@ -93,9 +67,7 @@ def validar_dados(conn, competencia):
         cur.execute(
             """
             SELECT COUNT(*)
-
             FROM public.estabelecimentos
-
             WHERE competencia = %s
             """,
             (competencia,),
@@ -108,12 +80,52 @@ def validar_dados(conn, competencia):
         raise RuntimeError(
             "Nenhum estabelecimento encontrado "
             f"para a competência {competencia}. "
-            "Execute primeiro "
-            "etl_estabelecimentos.py."
+            "Execute primeiro etl_estabelecimentos.py."
         )
 
     print(
-        f"Estabelecimentos encontrados: "
+        f"Estabelecimentos encontrados: {total:,}"
+    )
+
+    return total
+
+
+# ============================================================
+# VALIDAR BASE ANALÍTICA
+# ============================================================
+
+def validar_base_analitica(conn, competencia):
+    """
+    Exibe a quantidade de estabelecimentos ativos do Ceará
+    que efetivamente participarão do cálculo.
+    """
+
+    with conn.cursor() as cur:
+
+        cur.execute(
+            """
+            SELECT COUNT(*)
+            FROM public.estabelecimentos
+            WHERE competencia = %s
+              AND uf = 'CE'
+              AND situacao_cadastral_codigo = '02'
+              AND municipio_codigo IS NOT NULL
+              AND cnae_principal_codigo IS NOT NULL
+            """,
+            (competencia,),
+        )
+
+        total = cur.fetchone()[0]
+
+    if total == 0:
+
+        raise RuntimeError(
+            "Nenhum estabelecimento ativo do Ceará "
+            f"encontrado para {competencia}."
+        )
+
+    print(
+        f"Estabelecimentos ativos utilizados no QL: "
         f"{total:,}"
     )
 
@@ -129,10 +141,11 @@ def limpar_competencia(
     competencia,
 ):
     """
-    Remove resultados anteriores somente da competência
-    que será recalculada.
+    Remove somente os resultados da competência que será
+    recalculada.
 
-    Permite manter histórico das competências anteriores.
+    O DELETE não recebe commit aqui. Assim, DELETE + INSERT
+    permanecem na mesma transação.
     """
 
     with conn.cursor() as cur:
@@ -148,13 +161,6 @@ def limpar_competencia(
 
         removidos = cur.rowcount
 
-    # Não fazemos commit aqui.
-    #
-    # DELETE + INSERT devem permanecer na mesma transação.
-    #
-    # Se o cálculo falhar, o rollback restaura o resultado
-    # anterior da competência.
-
     return removidos
 
 
@@ -168,39 +174,37 @@ def calcular(
     carga_id,
 ):
     """
-    Calcula o cociente locacional por município e CNAE.
+    Calcula o cociente locacional por município e CNAE
+    principal.
 
     Fórmula:
 
-        empresas CNAE município
-        -----------------------
-        empresas município
+        estabelecimentos CNAE município
+        -------------------------------
+        estabelecimentos município
 
-                 /
+                     /
 
-        empresas CNAE Ceará
-        -------------------
-        empresas Ceará
+        estabelecimentos CNAE Ceará
+        ---------------------------
+        estabelecimentos Ceará
 
 
     Regras:
 
         - competência informada;
         - estabelecimento localizado no Ceará;
-        - situação cadastral ATIVA = 02;
+        - situação cadastral ativa (02);
         - CNAE principal;
-        - empresa distinta.
+        - cada estabelecimento ativo é uma unidade da contagem.
 
-    Observação:
+    IMPORTANTE:
 
-    public.estabelecimentos contém também filiais fora do Ceará
-    pertencentes às empresas do recorte estadual.
+    Não utilizamos COUNT(DISTINCT empresa_id).
 
-    Portanto o filtro:
-
-        uf = 'CE'
-
-    é obrigatório neste cálculo.
+    Uma empresa pode possuir vários estabelecimentos em municípios
+    diferentes. Para análise da concentração territorial, cada
+    estabelecimento deve participar da contagem.
     """
 
     with conn.cursor() as cur:
@@ -212,16 +216,13 @@ def calcular(
                 ------------------------------------------------
                 -- BASE ANALÍTICA
                 --
-                -- Um registro por:
-                --
-                -- empresa
-                -- município
-                -- CNAE
+                -- Cada linha representa um estabelecimento
+                -- ativo localizado no Ceará.
                 ------------------------------------------------
 
-                SELECT DISTINCT
+                SELECT
 
-                    e.empresa_id,
+                    e.id AS estabelecimento_id,
 
                     e.municipio_codigo,
 
@@ -237,8 +238,6 @@ def calcular(
 
                     AND e.situacao_cadastral_codigo = '02'
 
-                    AND e.empresa_id IS NOT NULL
-
                     AND e.municipio_codigo IS NOT NULL
 
                     AND e.cnae_principal_codigo IS NOT NULL
@@ -246,7 +245,7 @@ def calcular(
 
 
             ----------------------------------------------------
-            -- TOTAL DE EMPRESAS POR MUNICÍPIO
+            -- TOTAL DE ESTABELECIMENTOS POR MUNICÍPIO
             ----------------------------------------------------
 
             total_municipio AS (
@@ -255,9 +254,7 @@ def calcular(
 
                     municipio_codigo,
 
-                    COUNT(
-                        DISTINCT empresa_id
-                    ) AS total_empresas
+                    COUNT(*) AS total_estabelecimentos
 
                 FROM base
 
@@ -266,7 +263,7 @@ def calcular(
 
 
             ----------------------------------------------------
-            -- EMPRESAS POR MUNICÍPIO / CNAE
+            -- ESTABELECIMENTOS POR MUNICÍPIO / CNAE
             ----------------------------------------------------
 
             municipio_cnae AS (
@@ -277,9 +274,7 @@ def calcular(
 
                     cnae_principal_codigo,
 
-                    COUNT(
-                        DISTINCT empresa_id
-                    ) AS total_empresas
+                    COUNT(*) AS total_estabelecimentos
 
                 FROM base
 
@@ -292,23 +287,21 @@ def calcular(
 
 
             ----------------------------------------------------
-            -- TOTAL DE EMPRESAS DO ESTADO
+            -- TOTAL DE ESTABELECIMENTOS NO CEARÁ
             ----------------------------------------------------
 
             total_estado AS (
 
                 SELECT
 
-                    COUNT(
-                        DISTINCT empresa_id
-                    ) AS total_empresas
+                    COUNT(*) AS total_estabelecimentos
 
                 FROM base
             ),
 
 
             ----------------------------------------------------
-            -- TOTAL DE EMPRESAS POR CNAE NO ESTADO
+            -- TOTAL DE ESTABELECIMENTOS POR CNAE NO CEARÁ
             ----------------------------------------------------
 
             estado_cnae AS (
@@ -317,15 +310,11 @@ def calcular(
 
                     cnae_principal_codigo,
 
-                    COUNT(
-                        DISTINCT empresa_id
-                    ) AS total_empresas
+                    COUNT(*) AS total_estabelecimentos
 
                 FROM base
 
-                GROUP BY
-
-                    cnae_principal_codigo
+                GROUP BY cnae_principal_codigo
             )
 
 
@@ -375,36 +364,30 @@ def calcular(
 
                 ------------------------------------------------
                 -- COCIENTE LOCACIONAL
+                --
+                -- (Emc / Em) / (Eec / Ee)
                 ------------------------------------------------
 
                 ROUND(
 
                     (
-
-                        mc.total_empresas::NUMERIC
-
+                        mc.total_estabelecimentos::NUMERIC
                         /
-
                         NULLIF(
-                            tm.total_empresas,
+                            tm.total_estabelecimentos,
                             0
                         )
-
                     )
 
                     /
 
                     (
-
-                        ec.total_empresas::NUMERIC
-
+                        ec.total_estabelecimentos::NUMERIC
                         /
-
                         NULLIF(
-                            te.total_empresas,
+                            te.total_estabelecimentos,
                             0
                         )
-
                     ),
 
                     8
@@ -416,16 +399,16 @@ def calcular(
                 -- VALORES UTILIZADOS NO CÁLCULO
                 ------------------------------------------------
 
-                mc.total_empresas
+                mc.total_estabelecimentos
                     AS empresas_municipio_cnae,
 
-                tm.total_empresas
+                tm.total_estabelecimentos
                     AS empresas_municipio,
 
-                ec.total_empresas
+                ec.total_estabelecimentos
                     AS empresas_estado_cnae,
 
-                te.total_empresas
+                te.total_estabelecimentos
                     AS empresas_estado,
 
                 %s AS carga_id
@@ -463,13 +446,14 @@ def calcular(
 
             WHERE
 
-                mc.total_empresas > 0
+                mc.total_estabelecimentos > 0
 
-                AND tm.total_empresas > 0
+                AND tm.total_estabelecimentos > 0
 
-                AND ec.total_empresas > 0
+                AND ec.total_estabelecimentos > 0
 
-                AND te.total_empresas > 0
+                AND te.total_estabelecimentos > 0
+
 
             ORDER BY
 
@@ -497,9 +481,6 @@ def obter_estatisticas(
     conn,
     competencia,
 ):
-    """
-    Obtém informações para conferência do resultado.
-    """
 
     with conn.cursor() as cur:
 
@@ -539,23 +520,17 @@ def obter_estatisticas(
         resultado = cur.fetchone()
 
     return {
-
         "registros": resultado[0],
-
         "municipios": resultado[1],
-
         "cnaes": resultado[2],
-
         "minimo": resultado[3],
-
         "maximo": resultado[4],
-
         "media": resultado[5],
     }
 
 
 # ============================================================
-# EXIBIR MAIORES COCIENTES
+# CONFERIR CNAE / MUNICÍPIO
 # ============================================================
 
 def mostrar_maiores(
@@ -563,10 +538,6 @@ def mostrar_maiores(
     competencia,
     limite=10,
 ):
-    """
-    Mostra os maiores cocientes apenas para conferência
-    da execução.
-    """
 
     with conn.cursor() as cur:
 
@@ -582,7 +553,13 @@ def mostrar_maiores(
 
                 cociente_locacional,
 
-                empresas_municipio_cnae
+                empresas_municipio_cnae,
+
+                empresas_municipio,
+
+                empresas_estado_cnae,
+
+                empresas_estado
 
             FROM analytics.cociente_locacional
 
@@ -604,33 +581,39 @@ def mostrar_maiores(
         resultados = cur.fetchall()
 
     print()
-    print("=" * 100)
+    print("=" * 120)
     print("MAIORES COCIENTES LOCACIONAIS")
-    print("=" * 100)
+    print("=" * 120)
 
     for (
         municipio,
         cnae,
         descricao,
         cociente,
-        empresas,
+        municipio_cnae,
+        total_municipio,
+        estado_cnae,
+        total_estado,
     ) in resultados:
 
         descricao_curta = (
-            descricao[:45]
+            descricao[:40]
             if descricao
             else ""
         )
 
         print(
-            f"{municipio[:25]:25} | "
+            f"{municipio[:22]:22} | "
             f"{cnae:7} | "
             f"QL {float(cociente):10.4f} | "
-            f"{empresas:7,} empresas | "
+            f"M/CNAE {municipio_cnae:6,} | "
+            f"M {total_municipio:7,} | "
+            f"CE/CNAE {estado_cnae:7,} | "
+            f"CE {total_estado:9,} | "
             f"{descricao_curta}"
         )
 
-    print("=" * 100)
+    print("=" * 120)
 
 
 # ============================================================
@@ -646,6 +629,7 @@ def main():
     carga_id = None
 
     total_estabelecimentos = 0
+    total_base_analitica = 0
     registros_inseridos = 0
 
     try:
@@ -655,8 +639,7 @@ def main():
         print("COCIENTE LOCACIONAL")
         print("=" * 70)
         print(
-            f"Competência: "
-            f"{COMPETENCIA}"
+            f"Competência: {COMPETENCIA}"
         )
         print("=" * 70)
 
@@ -676,7 +659,7 @@ def main():
         )
 
         # ----------------------------------------------------
-        # VALIDAR ESTABELECIMENTOS
+        # VALIDAR DADOS
         # ----------------------------------------------------
 
         print()
@@ -686,6 +669,13 @@ def main():
 
         total_estabelecimentos = (
             validar_dados(
+                conn,
+                COMPETENCIA,
+            )
+        )
+
+        total_base_analitica = (
+            validar_base_analitica(
                 conn,
                 COMPETENCIA,
             )
@@ -703,12 +693,11 @@ def main():
 
         print()
         print(
-            f"Carga criada: "
-            f"ID={carga_id}"
+            f"Carga criada: ID={carga_id}"
         )
 
         # ----------------------------------------------------
-        # REMOVER RESULTADO ANTERIOR
+        # LIMPAR RESULTADO ANTERIOR
         # ----------------------------------------------------
 
         print()
@@ -760,7 +749,7 @@ def main():
         )
 
         # ----------------------------------------------------
-        # COMMIT DO DELETE + INSERT
+        # COMMIT
         # ----------------------------------------------------
 
         conn.commit()
@@ -782,7 +771,7 @@ def main():
             conn,
             carga_id,
             registros_lidos=(
-                total_estabelecimentos
+                total_base_analitica
             ),
             registros_processados=(
                 registros_inseridos
@@ -804,48 +793,53 @@ def main():
         print("=" * 70)
 
         print(
-            f"Competência:             "
+            f"Competência:                    "
             f"{COMPETENCIA}"
         )
 
         print(
-            f"Estabelecimentos lidos:  "
+            f"Estabelecimentos carregados:    "
             f"{total_estabelecimentos:,}"
         )
 
         print(
-            f"Registros calculados:    "
+            f"Estabelecimentos usados no QL:  "
+            f"{total_base_analitica:,}"
+        )
+
+        print(
+            f"Registros calculados:           "
             f"{estatisticas['registros']:,}"
         )
 
         print(
-            f"Municípios:              "
+            f"Municípios:                     "
             f"{estatisticas['municipios']:,}"
         )
 
         print(
-            f"CNAEs:                   "
+            f"CNAEs:                          "
             f"{estatisticas['cnaes']:,}"
         )
 
         if estatisticas["minimo"] is not None:
 
             print(
-                f"Menor QL:                "
+                f"Menor QL:                       "
                 f"{estatisticas['minimo']}"
             )
 
         if estatisticas["maximo"] is not None:
 
             print(
-                f"Maior QL:                "
+                f"Maior QL:                       "
                 f"{estatisticas['maximo']}"
             )
 
         if estatisticas["media"] is not None:
 
             print(
-                f"QL médio:                "
+                f"QL médio:                       "
                 f"{estatisticas['media']:.8f}"
             )
 
@@ -875,7 +869,7 @@ def main():
                 conn,
                 carga_id,
                 registros_lidos=(
-                    total_estabelecimentos
+                    total_base_analitica
                 ),
                 registros_processados=(
                     registros_inseridos
@@ -905,7 +899,7 @@ def main():
                 carga_id,
                 erro,
                 registros_lidos=(
-                    total_estabelecimentos
+                    total_base_analitica
                 ),
                 registros_processados=(
                     registros_inseridos

@@ -3,13 +3,28 @@ const CocienteLocacionalControllers = require("../controllers/CocienteLocacional
 
 const router = express.Router();
 
-// Consulta geral com filtros
+// ==========================================================
+// CONSULTA GERAL
+// ==========================================================
+
 router.get("/quociente", CocienteLocacionalControllers.listar);
 
-// Todos os CNAEs de determinado município
+// ==========================================================
+// COMPETÊNCIAS DISPONÍVEIS
+// ==========================================================
+
+router.get("/competencias", CocienteLocacionalControllers.competencias);
+
+// ==========================================================
+// CNAES DE UM MUNICÍPIO
+// ==========================================================
+
 router.get("/municipio/:codigo", CocienteLocacionalControllers.porMunicipio);
 
-// Todos os municípios de determinado CNAE
+// ==========================================================
+// MUNICÍPIOS DE UM CNAE
+// ==========================================================
+
 router.get("/cnae/:codigo", CocienteLocacionalControllers.porCnae);
 
 module.exports = router;
