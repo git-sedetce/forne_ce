@@ -8,6 +8,7 @@ import { ListaUsuariosComponent } from './components/admin/lista-usuarios/lista-
 import { authGuard } from './services/guards/auth.guard';
 import { roleGuard } from './services/guards/role.guard';
 import { ConsultaEmpresasComponent } from './components/empresa/consulta-empresas/consulta-empresas.component';
+import { SobreComponent } from './components/sobre/sobre.component';
 
 const routes: Routes = [
   {
@@ -25,6 +26,10 @@ const routes: Routes = [
   {
     path: 'reset-senha',
     component: ResetSenhaComponent,
+  },
+  {
+    path: 'sobre',
+    component: SobreComponent,
   },
   {
     path: 'lista-usuarios',

@@ -21,6 +21,7 @@ import { CpfCnpjValidacaoDirective } from '../directives/cpfcnpjvalidacao.direct
 import { ListaUsuariosComponent } from './components/admin/lista-usuarios/lista-usuarios.component';
 import { authInterceptor } from './services/interceptors/auth.interceptor';
 import { ConsultaEmpresasComponent } from './components/empresa/consulta-empresas/consulta-empresas.component';
+import { SobreComponent } from './components/sobre/sobre.component';
 
 @NgModule({
   declarations: [
@@ -34,7 +35,8 @@ import { ConsultaEmpresasComponent } from './components/empresa/consulta-empresa
     CpfcnpjMaskDirective,
     CpfCnpjValidacaoDirective,
     ListaUsuariosComponent,
-    ConsultaEmpresasComponent
+    ConsultaEmpresasComponent,
+    SobreComponent
   ],
   imports: [
     BrowserModule,
