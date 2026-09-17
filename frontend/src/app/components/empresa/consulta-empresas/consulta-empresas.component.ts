@@ -832,7 +832,9 @@ export class ConsultaEmpresasComponent implements OnInit {
 
       const [logoFornece, logoSde] = this.exibirLogosInstitucionais
         ? await Promise.all([
-            this.carregarImagemBase64('assets/imgs/logo-fornece-horizontal.png'),
+            this.carregarImagemBase64(
+              'assets/imgs/logo-fornece-horizontal.png',
+            ),
             this.carregarImagemBase64('assets/imgs/Logo-SDE---Horizontal.png'),
           ])
         : [null, null];
@@ -850,6 +852,7 @@ export class ConsultaEmpresasComponent implements OnInit {
       const larguraPagina = doc.internal.pageSize.getWidth();
       const alturaPagina = doc.internal.pageSize.getHeight();
       const margem = 18;
+      const limiteInferiorConteudo = alturaPagina - 25;
       const larguraConteudo = larguraPagina - margem * 2;
       const dataEmissao = new Intl.DateTimeFormat('pt-BR').format(new Date());
       const criteriosConsulta = this.obterCriteriosConsulta();
@@ -1078,32 +1081,38 @@ export class ConsultaEmpresasComponent implements OnInit {
       });
 
       // ===================================================
-      // VERIFICAR ESPAÇO DA PÁGINA
-      // ===================================================
-
-      if (y > alturaPagina - 70) {
-        doc.addPage();
-
-        y = this.adicionarCabecalhoPdf(doc, logoFornece, logoSde);
-        doc.setTextColor(7, 72, 90);
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(11);
-        doc.text('Informações da prospecção — continuação', margem, y);
-        y += 10;
-      }
-
-      // ===================================================
       // DATA LIMITE
       // ===================================================
 
       if (this.dataLimiteRetorno) {
+        const alturaDataLimite = 15;
+
+        if (y + alturaDataLimite > alturaPagina - 40) {
+          doc.addPage();
+
+          y = this.adicionarCabecalhoPdf(doc, logoFornece, logoSde);
+
+          doc.setTextColor(7, 72, 90);
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(11);
+
+          doc.text('Informações da prospecção — continuação', margem, y);
+
+          y += 10;
+        }
+
         doc.setTextColor(120, 135, 140);
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(7);
+
         doc.text('DATA LIMITE PARA RETORNO', margem, y);
+
         y += 4;
+
         doc.setTextColor(45, 63, 68);
+        doc.setFont('helvetica', 'normal');
         doc.setFontSize(9);
+
         doc.text(
           this.formatarDataBrasileira(this.dataLimiteRetorno),
           margem,
@@ -1118,71 +1127,59 @@ export class ConsultaEmpresasComponent implements OnInit {
       // ===================================================
 
       if (this.observacoesContato.trim()) {
-        doc.setTextColor(120, 135, 140);
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(7);
-        doc.text('OBSERVAÇÕES', margem, y);
-        y += 4;
-        doc.setTextColor(45, 63, 68);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(8);
-
         const observacoes = doc.splitTextToSize(
           this.observacoesContato,
           larguraConteudo,
         );
 
-        const alturaObservacoes = observacoes.length * 4 + 12;
+        /*
+         * 4 mm para o espaço entre label e texto,
+         * 4 mm aproximadamente por linha,
+         * mais uma margem de segurança.
+         */
+        const alturaObservacoes = 4 + observacoes.length * 4 + 8;
 
-        if (y + alturaObservacoes > alturaPagina - 30) {
+        /*
+         * Verifica ANTES de escrever qualquer conteúdo.
+         */
+        if (y + alturaObservacoes > alturaPagina - 40) {
           doc.addPage();
+
           y = this.adicionarCabecalhoPdf(doc, logoFornece, logoSde);
+
           doc.setTextColor(7, 72, 90);
           doc.setFont('helvetica', 'bold');
           doc.setFontSize(11);
+
           doc.text('Informações da prospecção — continuação', margem, y);
+
           y += 10;
-          doc.setTextColor(120, 135, 140);
-          doc.setFontSize(7);
-          doc.text('OBSERVAÇÕES', margem, y);
-          y += 4;
         }
 
+        // LABEL
+
+        doc.setTextColor(120, 135, 140);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7);
+
+        doc.text('OBSERVAÇÕES', margem, y);
+
+        y += 4;
+
+        // CONTEÚDO
+
+        doc.setTextColor(45, 63, 68);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+
         doc.text(observacoes, margem, y);
+
         y += observacoes.length * 4;
         y += 6;
       }
 
       // ===================================================
-      // EMISSÃO
-      // ===================================================
-
-      doc.setDrawColor(225, 232, 234);
-
-      doc.line(
-        margem,
-        alturaPagina - 34,
-        larguraPagina - margem,
-        alturaPagina - 34,
-      );
-
-      doc.setFont('helvetica', 'normal');
-
-      doc.setFontSize(7.5);
-
-      doc.setTextColor(125, 137, 141);
-
-      doc.text(
-        `Documento gerado em ${dataEmissao}`,
-        larguraPagina / 2,
-        alturaPagina - 27,
-        {
-          align: 'center',
-        },
-      );
-
-      // ===================================================
-      // PÁGINA 2 - EMPRESAS
+      // NOVA SEÇÃO - EMPRESAS SELECIONADAS
       // ===================================================
 
       doc.addPage();
@@ -1325,18 +1322,13 @@ export class ConsultaEmpresasComponent implements OnInit {
         // QUEBRA DE PÁGINA
         // =================================================
 
-        if (y + alturaCard > alturaPagina - 22) {
+        if (y + alturaCard > limiteInferiorConteudo) {
           doc.addPage();
 
           y = this.adicionarCabecalhoPdf(doc, logoFornece, logoSde);
 
-          /*
-           * Identificação da continuação.
-           */
           doc.setTextColor(7, 72, 90);
-
           doc.setFont('helvetica', 'bold');
-
           doc.setFontSize(11);
 
           doc.text('Empresas selecionadas — continuação', margem, y);
@@ -1549,7 +1541,42 @@ export class ConsultaEmpresasComponent implements OnInit {
       const totalPaginasPdf = doc.getNumberOfPages();
 
       for (let paginaPdf = 1; paginaPdf <= totalPaginasPdf; paginaPdf++) {
-        // ...
+        doc.setPage(paginaPdf);
+
+        // Linha
+
+        doc.setDrawColor(225, 232, 234);
+        doc.setLineWidth(0.2);
+
+        doc.line(
+          margem,
+          alturaPagina - 15,
+          larguraPagina - margem,
+          alturaPagina - 15,
+        );
+
+        // Data
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+        doc.setTextColor(125, 137, 141);
+
+        doc.text(
+          `Documento gerado em ${dataEmissao}`,
+          margem,
+          alturaPagina - 9,
+        );
+
+        // Paginação
+
+        doc.text(
+          `Página ${paginaPdf} de ${totalPaginasPdf}`,
+          larguraPagina - margem,
+          alturaPagina - 9,
+          {
+            align: 'right',
+          },
+        );
       }
 
       // ===================================================
@@ -1723,18 +1750,18 @@ export class ConsultaEmpresasComponent implements OnInit {
     if (logoFornece && logoSde) {
       doc.addImage(logoFornece, 'PNG', margem, 10, 78, 31);
 
-    /*
-     * Separador vertical entre as marcas.
-     */
+      /*
+       * Separador vertical entre as marcas.
+       */
       doc.setDrawColor(210, 220, 223);
 
       doc.setLineWidth(0.3);
 
       doc.line(101, 12, 101, 39);
 
-    /*
-     * Logo Governo do Ceará / SDE
-     */
+      /*
+       * Logo Governo do Ceará / SDE
+       */
       doc.addImage(logoSde, 'PNG', 108, 11, 86, 30);
     }
 
