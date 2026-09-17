@@ -47,6 +47,6 @@ export class IndicadoresService {
       params = params.set('competencia', competencia);
     }
 
-    return this.http.get<RespostaLocacional>(`${this.apiUrl}/`, { params });
+    return this.http.get<RespostaLocacional>(`${this.apiUrl}/quociente`, { params });
   }
 }

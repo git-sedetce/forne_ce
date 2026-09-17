@@ -4,7 +4,7 @@ const CocienteLocacionalControllers = require("../controllers/CocienteLocacional
 const router = express.Router();
 
 // Consulta geral com filtros
-router.get("/", CocienteLocacionalControllers.listar);
+router.get("/quociente", CocienteLocacionalControllers.listar);
 
 // Todos os CNAEs de determinado município
 router.get("/municipio/:codigo", CocienteLocacionalControllers.porMunicipio);
