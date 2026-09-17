@@ -22,6 +22,7 @@ import { ListaUsuariosComponent } from './components/admin/lista-usuarios/lista-
 import { authInterceptor } from './services/interceptors/auth.interceptor';
 import { ConsultaEmpresasComponent } from './components/empresa/consulta-empresas/consulta-empresas.component';
 import { SobreComponent } from './components/sobre/sobre.component';
+import { IndicadoresComponent } from './components/indicadores/indicadores.component';
 
 @NgModule({
   declarations: [
@@ -36,7 +37,8 @@ import { SobreComponent } from './components/sobre/sobre.component';
     CpfCnpjValidacaoDirective,
     ListaUsuariosComponent,
     ConsultaEmpresasComponent,
-    SobreComponent
+    SobreComponent,
+    IndicadoresComponent
   ],
   imports: [
     BrowserModule,

@@ -291,12 +291,12 @@ class EmpresaControllers {
         .trim()
         .toUpperCase();
 
-      const page = 10; //Math.max(Number.parseInt(req.query.page, 10) || 1, 1);
+      const page = Math.max(Number.parseInt(req.query.page, 10) || 1, 1);
 
-      const limit = 10; /*Math.min(
+      const limit = Math.min(
         Math.max(Number.parseInt(req.query.limit, 10) || 50, 1),
         100,
-      );*/
+      );
 
       const offset = (page - 1) * limit;
 

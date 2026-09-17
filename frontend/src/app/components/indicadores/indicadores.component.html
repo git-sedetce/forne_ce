@@ -1,0 +1,172 @@
+<main class="indicators-page">
+	<div class="indicators-container">
+		<header class="page-header">
+			<div>
+				<span class="eyebrow">Observatório empresarial</span>
+				<h1>Indicadores do Ceará</h1>
+				<p>
+					Uma leitura dos negócios ativos, das atividades econômicas e das
+					especializações produtivas do estado.
+				</p>
+			</div>
+
+			<div class="competence" *ngIf="competencia">
+				<span>Competência</span>
+				<strong>{{ competencia }}</strong>
+			</div>
+		</header>
+
+		<div class="loading-state" *ngIf="carregando">
+			<i class="fa-solid fa-spinner fa-spin"></i>
+			<strong>Carregando indicadores...</strong>
+			<span>Estamos organizando os dados mais recentes do Ceará.</span>
+		</div>
+
+		<section class="error-state" *ngIf="erro && !carregando" role="alert">
+			<i class="fa-solid fa-circle-exclamation"></i>
+			<div>
+				<strong>Não foi possível carregar os indicadores</strong>
+				<span>{{ erro }}</span>
+			</div>
+			<button type="button" (click)="carregarIndicadores()">
+				<i class="fa-solid fa-rotate-right"></i>
+				Tentar novamente
+			</button>
+		</section>
+
+		<ng-container *ngIf="!carregando && !erro">
+			<section class="metric-grid" aria-label="Resumo dos indicadores">
+				<article class="metric-card metric-blue">
+					<div class="metric-icon"><i class="fa-solid fa-building"></i></div>
+					<span>Empresas ativas</span>
+					<strong>{{ formatarNumero(resumo?.quantidade?.empresas) }}</strong>
+					<small>Empresas distintas no Ceará</small>
+				</article>
+
+				<article class="metric-card metric-green">
+					<div class="metric-icon"><i class="fa-solid fa-store"></i></div>
+					<span>Estabelecimentos</span>
+					<strong>{{ formatarNumero(resumo?.quantidade?.estabelecimentos) }}</strong>
+					<small>Unidades em atividade</small>
+				</article>
+
+				<article class="metric-card metric-orange">
+					<div class="metric-icon"><i class="fa-solid fa-map-location-dot"></i></div>
+					<span>Municípios analisados</span>
+					<strong>{{ municipios.length || 0 }}</strong>
+					<small>Municípios com empresas ativas</small>
+				</article>
+
+				<article class="metric-card metric-navy">
+					<div class="metric-icon"><i class="fa-solid fa-chart-line"></i></div>
+					<span>Filiais ativas</span>
+					<strong>{{ formatarNumero(resumo?.quantidade?.filiais) }}</strong>
+					<small>Presença operacional no estado</small>
+				</article>
+			</section>
+
+			<section class="dashboard-grid">
+				<article class="panel municipality-panel">
+					<header class="panel-header">
+						<div>
+							<span class="panel-kicker">Distribuição territorial</span>
+							<h2>Municípios com mais empresas</h2>
+						</div>
+						<i class="fa-solid fa-location-dot panel-mark"></i>
+					</header>
+
+					<div class="municipality-list" *ngIf="municipios.length; else noMunicipios">
+						<div class="municipality-row" *ngFor="let municipio of municipios; let i = index">
+							<span class="row-position">{{ i + 1 }}</span>
+							<div class="row-content">
+								<div class="row-label">
+									<strong>{{ municipio.municipio }}</strong>
+									<span>{{ formatarNumero(municipio.quantidade_empresas) }}</span>
+								</div>
+								<div class="bar-track">
+									<span [style.width.%]="percentualMunicipio(municipio.quantidade_empresas)"></span>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<ng-template #noMunicipios>
+						<p class="empty-state">Nenhum município encontrado.</p>
+					</ng-template>
+				</article>
+
+				<article class="panel cnae-panel">
+					<header class="panel-header">
+						<div>
+							<span class="panel-kicker">Atividade econômica</span>
+							<h2>Principais CNAEs</h2>
+						</div>
+						<i class="fa-solid fa-ranking-star panel-mark"></i>
+					</header>
+
+					<div class="table-wrapper">
+						<table *ngIf="cnaes.length; else noCnaes">
+							<thead>
+								<tr>
+									<th>Pos.</th>
+									<th>Atividade</th>
+									<th class="number-cell">Empresas</th>
+								</tr>
+							</thead>
+							<tbody>
+								<tr *ngFor="let cnae of cnaes; let i = index">
+									<td><span class="table-position">{{ i + 1 }}</span></td>
+									<td>
+										<strong>{{ cnae.cnae_descricao }}</strong>
+										<small>{{ cnae.cnae_formatado || formatarCnae(cnae.cnae_codigo) }}</small>
+									</td>
+									<td class="number-cell"><strong>{{ formatarNumero(cnae.quantidade_empresas) }}</strong></td>
+								</tr>
+							</tbody>
+						</table>
+					</div>
+					<ng-template #noCnaes>
+						<p class="empty-state">Nenhuma atividade encontrada.</p>
+					</ng-template>
+				</article>
+			</section>
+
+			<section class="panel specialization-panel">
+				<header class="panel-header specialization-header">
+					<div>
+						<span class="panel-kicker">Cociente locacional</span>
+						<h2>Especializações produtivas do Ceará</h2>
+						<p>
+							Atividades com maior concentração relativa em um município,
+							comparadas à estrutura econômica estadual.
+						</p>
+					</div>
+					<div class="ql-legend"><strong>QL</strong><span>maior concentração</span></div>
+				</header>
+
+				<div class="specialization-list" *ngIf="especializacoes.length; else noEspecializacoes">
+					<article class="specialization-item" *ngFor="let item of especializacoes; let i = index">
+						<span class="specialization-rank">{{ (i + 1).toString().padStart(2, '0') }}</span>
+						<div class="specialization-main">
+							<strong>{{ item.cnae_descricao }}</strong>
+							<span>{{ item.municipio_nome }} · {{ item.cnae_codigo }}</span>
+						</div>
+						<div class="specialization-value">
+							<strong>{{ formatarQl(item.cociente_locacional) }}</strong>
+							<span>cociente</span>
+						</div>
+					</article>
+				</div>
+
+				<ng-template #noEspecializacoes>
+					<p class="empty-state">Nenhum cociente locacional encontrado.</p>
+				</ng-template>
+			</section>
+
+			<footer class="data-note">
+				<i class="fa-solid fa-circle-info"></i>
+				<span>Os indicadores consideram estabelecimentos com situação cadastral ativa na competência apresentada.</span>
+			</footer>
+		</ng-container>
+	</div>
+</main>

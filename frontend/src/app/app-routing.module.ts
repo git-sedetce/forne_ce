@@ -9,6 +9,7 @@ import { authGuard } from './services/guards/auth.guard';
 import { roleGuard } from './services/guards/role.guard';
 import { ConsultaEmpresasComponent } from './components/empresa/consulta-empresas/consulta-empresas.component';
 import { SobreComponent } from './components/sobre/sobre.component';
+import { IndicadoresComponent } from './components/indicadores/indicadores.component';
 
 const routes: Routes = [
   {
@@ -30,6 +31,10 @@ const routes: Routes = [
   {
     path: 'sobre',
     component: SobreComponent,
+  },
+  {
+    path: 'indicadores',
+    component: IndicadoresComponent,
   },
   {
     path: 'lista-usuarios',
