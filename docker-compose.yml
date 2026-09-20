@@ -8,6 +8,7 @@ services:
     image: postgres:17
     container_name: observatorio-postgres
     restart: unless-stopped
+    shm_size: '1gb'
 
     environment:
       POSTGRES_DB: ${DB_NAME}
