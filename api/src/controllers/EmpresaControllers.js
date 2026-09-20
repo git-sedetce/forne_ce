@@ -32,6 +32,278 @@ class EmpresaControllers {
   }
 
   /**
+   * Expressão SQL responsável pela classificação do CNAE principal
+   * em grandes segmentos econômicos.
+   *
+   * A classificação utiliza os dois primeiros dígitos do CNAE
+   * (divisão CNAE).
+   */
+  static sqlSegmentoCnae(alias = "est") {
+    return `
+    CASE
+      WHEN ${alias}.cnae_principal_codigo
+           ~ '^[0-9]{7}$'
+      THEN
+        CASE
+          /* Indústrias extrativas + transformação */
+          WHEN LEFT(
+            ${alias}.cnae_principal_codigo,
+            2
+          )::INTEGER BETWEEN 5 AND 33
+            THEN 'INDUSTRIA'
+          /* Comércio */
+          WHEN LEFT(
+            ${alias}.cnae_principal_codigo,
+            2
+          )::INTEGER BETWEEN 45 AND 47
+            THEN 'COMERCIO'
+          /* Serviços */
+          WHEN (
+            LEFT(
+              ${alias}.cnae_principal_codigo,
+              2
+            )::INTEGER BETWEEN 49 AND 66
+            OR LEFT(
+              ${alias}.cnae_principal_codigo,
+              2
+            )::INTEGER BETWEEN 68 AND 75
+            OR LEFT(
+              ${alias}.cnae_principal_codigo,
+              2
+            )::INTEGER BETWEEN 77 AND 82
+            OR LEFT(
+              ${alias}.cnae_principal_codigo,
+              2
+            )::INTEGER BETWEEN 85 AND 88
+            OR LEFT(
+              ${alias}.cnae_principal_codigo,
+              2
+            )::INTEGER BETWEEN 90 AND 96
+          )
+            THEN 'SERVICOS'
+          ELSE 'OUTROS'
+        END
+      ELSE 'OUTROS'
+    END
+  `;
+  }
+
+  /**
+   * Monta os filtros compartilhados pelo dashboard de indicadores.
+   */
+  static montarFiltrosIndicadores(query, competencia) {
+    const uf = String(query.uf || "CE")
+      .trim()
+      .toUpperCase();
+
+    const municipio = String(query.municipio || "").trim();
+
+    const regiao = String(query.regiao || "").trim();
+
+    const segmento = String(query.segmento || "")
+      .trim()
+      .toUpperCase();
+
+    const situacao = String(query.situacao || "").trim();
+
+    const dataInicial = String(query.dataInicial || "").trim();
+
+    const dataFinal = String(query.dataFinal || "").trim();
+
+    const tipoData = String(query.tipoData || "INICIO_ATIVIDADE")
+      .trim()
+      .toUpperCase();
+
+    /*
+     * Quando o frontend selecionar uma região,
+     * enviará também os municípios:
+     *
+     * municipios=Fortaleza|Caucaia|Maracanau
+     */
+    const municipios = String(query.municipios || "")
+      .split("|")
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    // =====================================================
+    // VALIDAÇÕES
+    // =====================================================
+
+    if (!/^[A-Z]{2}$/.test(uf)) {
+      const error = new Error("A UF deve conter exatamente duas letras.");
+
+      error.status = 400;
+      throw error;
+    }
+
+    const segmentosPermitidos = [
+      "",
+      "INDUSTRIA",
+      "COMERCIO",
+      "SERVICOS",
+      "OUTROS",
+    ];
+
+    if (!segmentosPermitidos.includes(segmento)) {
+      const error = new Error(
+        "Segmento inválido. Utilize INDUSTRIA, COMERCIO, SERVICOS ou OUTROS.",
+      );
+
+      error.status = 400;
+      throw error;
+    }
+
+    const situacoesPermitidas = ["", "01", "02", "03", "04", "08"];
+
+    if (!situacoesPermitidas.includes(situacao)) {
+      const error = new Error("Situação cadastral inválida.");
+
+      error.status = 400;
+      throw error;
+    }
+
+    const tiposDataPermitidos = ["INICIO_ATIVIDADE", "SITUACAO_CADASTRAL"];
+
+    if (!tiposDataPermitidos.includes(tipoData)) {
+      const error = new Error(
+        "tipoData deve ser INICIO_ATIVIDADE ou SITUACAO_CADASTRAL.",
+      );
+
+      error.status = 400;
+      throw error;
+    }
+
+    const regexData = /^\d{4}-\d{2}-\d{2}$/;
+
+    if (dataInicial && !regexData.test(dataInicial)) {
+      const error = new Error("dataInicial deve estar no formato YYYY-MM-DD.");
+
+      error.status = 400;
+      throw error;
+    }
+
+    if (dataFinal && !regexData.test(dataFinal)) {
+      const error = new Error("dataFinal deve estar no formato YYYY-MM-DD.");
+
+      error.status = 400;
+      throw error;
+    }
+
+    if (dataInicial && dataFinal && dataInicial > dataFinal) {
+      const error = new Error(
+        "A data inicial não pode ser maior que a data final.",
+      );
+
+      error.status = 400;
+      throw error;
+    }
+
+    if (regiao && !municipio && municipios.length === 0) {
+      const error = new Error(
+        "Informe os municípios pertencentes à região selecionada.",
+      );
+
+      error.status = 400;
+      throw error;
+    }
+
+    // =====================================================
+    // WHERE
+    // =====================================================
+
+    const where = ["est.uf = :uf", "est.competencia = :competencia"];
+
+    const replacements = {
+      uf,
+      competencia,
+    };
+
+    // Município específico tem prioridade sobre região.
+    if (municipio) {
+      where.push("UPPER(TRIM(mun.nome)) = :municipio");
+
+      replacements.municipio = municipio.toUpperCase();
+    } else if (regiao && municipios.length > 0) {
+      const parametros = [];
+
+      municipios.forEach((nomeMunicipio, index) => {
+        const chave = `municipioRegiao${index}`;
+
+        replacements[chave] = nomeMunicipio.toUpperCase();
+
+        parametros.push(`:${chave}`);
+      });
+
+      where.push(`
+      UPPER(TRIM(mun.nome))
+      IN (${parametros.join(", ")})
+    `);
+    }
+
+    // Situação cadastral.
+    if (situacao) {
+      where.push(`
+      est.situacao_cadastral_codigo = :situacao
+    `);
+
+      replacements.situacao = situacao;
+    }
+
+    // Segmento.
+    if (segmento) {
+      const sqlSegmento = EmpresaControllers.sqlSegmentoCnae("est");
+
+      where.push(`
+      (${sqlSegmento}) = :segmento
+    `);
+
+      replacements.segmento = segmento;
+    }
+
+    // =====================================================
+    // PERÍODO
+    // =====================================================
+
+    const campoData =
+      tipoData === "SITUACAO_CADASTRAL"
+        ? "est.data_situacao_cadastral"
+        : "est.data_inicio_atividade";
+
+    if (dataInicial) {
+      where.push(`
+      ${campoData} >= :dataInicial
+    `);
+
+      replacements.dataInicial = dataInicial;
+    }
+
+    if (dataFinal) {
+      where.push(`
+      ${campoData} <= :dataFinal
+    `);
+
+      replacements.dataFinal = dataFinal;
+    }
+
+    return {
+      uf,
+      municipio,
+      regiao,
+      municipios,
+      segmento,
+      situacao,
+      dataInicial,
+      dataFinal,
+      tipoData,
+      campoData,
+
+      whereSql: where.join("\n AND "),
+
+      replacements,
+    };
+  }
+
+  /**
    * GET /api/empresas/estatisticas/ativas
    *
    * Retorna a quantidade de estabelecimentos ativos no estado.
@@ -1416,6 +1688,554 @@ class EmpresaControllers {
 
       return res.status(error.status || 500).json({
         message: error.message || "Erro ao pesquisar empresas.",
+      });
+    }
+  }
+
+  /**
+   * GET /estatisticas/indicadores
+   *
+   * Dashboard consolidado dos indicadores empresariais.
+   *
+   * Query params:
+   *
+   * uf=CE
+   * competencia=2026-08
+   * regiao=Grande Fortaleza
+   * municipios=Fortaleza|Caucaia|Maracanau
+   * municipio=Fortaleza
+   * segmento=COMERCIO
+   * situacao=02
+   * dataInicial=2026-01-01
+   * dataFinal=2026-12-31
+   * tipoData=INICIO_ATIVIDADE
+   */
+  static async indicadoresDashboard(req, res) {
+    try {
+      // =====================================================
+      // COMPETÊNCIA
+      // =====================================================
+
+      const competencia = await EmpresaControllers.obterCompetencia(
+        req.query.competencia,
+      );
+
+      if (!competencia) {
+        return res.status(404).json({
+          message: "Nenhuma competência encontrada.",
+        });
+      }
+
+      // =====================================================
+      // FILTROS
+      // =====================================================
+
+      const filtros = EmpresaControllers.montarFiltrosIndicadores(
+        req.query,
+        competencia,
+      );
+
+      const { whereSql, replacements, campoData } = filtros;
+
+      const sqlSegmento = EmpresaControllers.sqlSegmentoCnae("est");
+
+      // =====================================================
+      // 1. RESUMO
+      // =====================================================
+
+      const sqlResumo = `
+      SELECT
+        COUNT(
+          DISTINCT est.cnpj_basico
+        )::BIGINT AS empresas,
+
+        COUNT(
+          DISTINCT est.cnpj_completo
+        )::BIGINT AS estabelecimentos,
+
+        COUNT(
+          DISTINCT est.municipio_codigo
+        )::BIGINT AS municipios,
+
+        COUNT(
+          DISTINCT est.cnae_principal_codigo
+        )::BIGINT AS cnaes,
+
+        COUNT(
+          DISTINCT CASE
+            WHEN est.identificador_matriz_filial = '1'
+            THEN est.cnpj_completo
+          END
+        )::BIGINT AS matrizes,
+
+        COUNT(
+          DISTINCT CASE
+            WHEN est.identificador_matriz_filial = '2'
+            THEN est.cnpj_completo
+          END
+        )::BIGINT AS filiais
+
+      FROM public.estabelecimentos est
+
+      LEFT JOIN public.municipios mun
+        ON mun.codigo = est.municipio_codigo
+
+      WHERE ${whereSql}
+    `;
+
+      // =====================================================
+      // 2. SITUAÇÕES CADASTRAIS
+      // =====================================================
+
+      /*
+       * IMPORTANTE:
+       *
+       * Se o usuário filtrar situação=02, este gráfico
+       * naturalmente mostrará somente ATIVA.
+       *
+       * Sem filtro de situação, mostra a distribuição completa.
+       */
+      const sqlSituacoes = `
+      SELECT
+        est.situacao_cadastral_codigo
+          AS codigo,
+
+        CASE
+          WHEN est.situacao_cadastral_codigo = '01'
+            THEN 'NULA'
+
+          WHEN est.situacao_cadastral_codigo = '02'
+            THEN 'ATIVA'
+
+          WHEN est.situacao_cadastral_codigo = '03'
+            THEN 'SUSPENSA'
+
+          WHEN est.situacao_cadastral_codigo = '04'
+            THEN 'INAPTA'
+
+          WHEN est.situacao_cadastral_codigo = '08'
+            THEN 'BAIXADA'
+
+          ELSE 'NÃO INFORMADA'
+        END AS descricao,
+
+        COUNT(
+          DISTINCT est.cnpj_basico
+        )::BIGINT AS quantidade_empresas,
+
+        COUNT(
+          DISTINCT est.cnpj_completo
+        )::BIGINT AS quantidade_estabelecimentos
+
+      FROM public.estabelecimentos est
+
+      LEFT JOIN public.municipios mun
+        ON mun.codigo = est.municipio_codigo
+
+      WHERE ${whereSql}
+
+      GROUP BY
+        est.situacao_cadastral_codigo
+
+      ORDER BY
+        est.situacao_cadastral_codigo
+    `;
+
+      // =====================================================
+      // 3. SEGMENTOS
+      // =====================================================
+
+      const sqlSegmentos = `
+      SELECT
+        ${sqlSegmento} AS segmento,
+
+        COUNT(
+          DISTINCT est.cnpj_basico
+        )::BIGINT AS quantidade_empresas,
+
+        COUNT(
+          DISTINCT est.cnpj_completo
+        )::BIGINT AS quantidade_estabelecimentos
+
+      FROM public.estabelecimentos est
+
+      LEFT JOIN public.municipios mun
+        ON mun.codigo = est.municipio_codigo
+
+      WHERE ${whereSql}
+
+        AND est.cnae_principal_codigo
+            IS NOT NULL
+
+        AND est.cnae_principal_codigo
+            ~ '^[0-9]{7}$'
+
+      GROUP BY
+        ${sqlSegmento}
+
+      ORDER BY
+        quantidade_empresas DESC
+    `;
+
+      // =====================================================
+      // 4. MUNICÍPIOS
+      // =====================================================
+
+      const sqlMunicipios = `
+      SELECT
+        est.municipio_codigo,
+
+        mun.nome AS municipio,
+
+        COUNT(
+          DISTINCT est.cnpj_basico
+        )::BIGINT AS quantidade_empresas,
+
+        COUNT(
+          DISTINCT est.cnpj_completo
+        )::BIGINT AS quantidade_estabelecimentos,
+
+        COUNT(
+          DISTINCT CASE
+            WHEN est.identificador_matriz_filial = '1'
+            THEN est.cnpj_completo
+          END
+        )::BIGINT AS quantidade_matrizes,
+
+        COUNT(
+          DISTINCT CASE
+            WHEN est.identificador_matriz_filial = '2'
+            THEN est.cnpj_completo
+          END
+        )::BIGINT AS quantidade_filiais
+
+      FROM public.estabelecimentos est
+
+      INNER JOIN public.municipios mun
+        ON mun.codigo = est.municipio_codigo
+
+      WHERE ${whereSql}
+
+      GROUP BY
+        est.municipio_codigo,
+        mun.nome
+
+      ORDER BY
+        quantidade_empresas DESC,
+        mun.nome ASC
+    `;
+
+      // =====================================================
+      // 5. TOP 10 ATIVIDADES ECONÔMICAS
+      // =====================================================
+
+      const sqlTopAtividades = `
+      SELECT
+        est.cnae_principal_codigo
+          AS cnae_codigo,
+
+        cnae.descricao
+          AS cnae_descricao,
+
+        COUNT(
+          DISTINCT est.cnpj_basico
+        )::BIGINT AS quantidade_empresas,
+
+        COUNT(
+          DISTINCT est.cnpj_completo
+        )::BIGINT AS quantidade_estabelecimentos,
+
+        COUNT(
+          DISTINCT CASE
+            WHEN est.identificador_matriz_filial = '1'
+            THEN est.cnpj_completo
+          END
+        )::BIGINT AS quantidade_matrizes,
+
+        COUNT(
+          DISTINCT CASE
+            WHEN est.identificador_matriz_filial = '2'
+            THEN est.cnpj_completo
+          END
+        )::BIGINT AS quantidade_filiais
+
+      FROM public.estabelecimentos est
+
+      INNER JOIN public.cnaes cnae
+        ON cnae.codigo =
+           est.cnae_principal_codigo
+
+      LEFT JOIN public.municipios mun
+        ON mun.codigo =
+           est.municipio_codigo
+
+      WHERE ${whereSql}
+
+        AND est.cnae_principal_codigo
+            IS NOT NULL
+
+      GROUP BY
+        est.cnae_principal_codigo,
+        cnae.descricao
+
+      ORDER BY
+        quantidade_empresas DESC,
+        cnae.descricao ASC
+
+      LIMIT 10
+    `;
+
+      // =====================================================
+      // 6. EVOLUÇÃO TEMPORAL
+      // =====================================================
+
+      /*
+       * O campo usado depende de tipoData:
+       *
+       * INICIO_ATIVIDADE
+       *   -> data_inicio_atividade
+       *
+       * SITUACAO_CADASTRAL
+       *   -> data_situacao_cadastral
+       */
+      const sqlEvolucao = `
+      SELECT
+        DATE_TRUNC(
+          'month',
+          ${campoData}
+        )::DATE AS periodo,
+
+        COUNT(
+          DISTINCT est.cnpj_basico
+        )::BIGINT AS quantidade_empresas,
+
+        COUNT(
+          DISTINCT est.cnpj_completo
+        )::BIGINT AS quantidade_estabelecimentos
+
+      FROM public.estabelecimentos est
+
+      LEFT JOIN public.municipios mun
+        ON mun.codigo =
+           est.municipio_codigo
+
+      WHERE ${whereSql}
+
+        AND ${campoData} IS NOT NULL
+
+      GROUP BY
+        DATE_TRUNC(
+          'month',
+          ${campoData}
+        )
+
+      ORDER BY
+        periodo ASC
+    `;
+
+      // =====================================================
+      // EXECUTAR EM PARALELO
+      // =====================================================
+
+      const [
+        resumoResultado,
+        situacoesResultado,
+        segmentosResultado,
+        municipiosResultado,
+        topAtividadesResultado,
+        evolucaoResultado,
+      ] = await Promise.all([
+        database.sequelize.query(sqlResumo, {
+          replacements,
+          type: QueryTypes.SELECT,
+        }),
+
+        database.sequelize.query(sqlSituacoes, {
+          replacements,
+          type: QueryTypes.SELECT,
+        }),
+
+        database.sequelize.query(sqlSegmentos, {
+          replacements,
+          type: QueryTypes.SELECT,
+        }),
+
+        database.sequelize.query(sqlMunicipios, {
+          replacements,
+          type: QueryTypes.SELECT,
+        }),
+
+        database.sequelize.query(sqlTopAtividades, {
+          replacements,
+          type: QueryTypes.SELECT,
+        }),
+
+        database.sequelize.query(sqlEvolucao, {
+          replacements,
+          type: QueryTypes.SELECT,
+        }),
+      ]);
+
+      // =====================================================
+      // RESUMO
+      // =====================================================
+
+      const resumoBanco = resumoResultado[0] || {};
+
+      const resumo = {
+        empresas: Number(resumoBanco.empresas || 0),
+        estabelecimentos: Number(resumoBanco.estabelecimentos || 0),
+        municipios: Number(resumoBanco.municipios || 0),
+        cnaes: Number(resumoBanco.cnaes || 0),
+        matrizes: Number(resumoBanco.matrizes || 0),
+        filiais: Number(resumoBanco.filiais || 0),
+      };
+
+      // =====================================================
+      // SITUAÇÕES
+      // =====================================================
+
+      const situacoesMap = new Map(
+        situacoesResultado.map((item) => [item.codigo, item]),
+      );
+
+      /*
+       * Quando NÃO houver filtro por situação,
+       * garantimos que os cinco códigos apareçam,
+       * mesmo que algum tenha quantidade zero.
+       */
+      const situacoesPadrao = [
+        {
+          codigo: "01",
+          descricao: "NULA",
+        },
+        {
+          codigo: "02",
+          descricao: "ATIVA",
+        },
+        {
+          codigo: "03",
+          descricao: "SUSPENSA",
+        },
+        {
+          codigo: "04",
+          descricao: "INAPTA",
+        },
+        {
+          codigo: "08",
+          descricao: "BAIXADA",
+        },
+      ];
+
+      let situacoes;
+
+      if (filtros.situacao) {
+        situacoes = situacoesResultado.map((item) => ({
+          codigo: item.codigo,
+          descricao: item.descricao,
+          quantidade_empresas: Number(item.quantidade_empresas || 0),
+          quantidade_estabelecimentos: Number(
+            item.quantidade_estabelecimentos || 0,
+          ),
+        }));
+      } else {
+        situacoes = situacoesPadrao.map((situacao) => {
+          const encontrado = situacoesMap.get(situacao.codigo);
+          return {
+            ...situacao,
+            quantidade_empresas: Number(encontrado?.quantidade_empresas || 0),
+            quantidade_estabelecimentos: Number(
+              encontrado?.quantidade_estabelecimentos || 0,
+            ),
+          };
+        });
+      }
+
+      // =====================================================
+      // SEGMENTOS
+      // =====================================================
+
+      const segmentos = segmentosResultado.map((item) => ({
+        segmento: item.segmento,
+        quantidade_empresas: Number(item.quantidade_empresas || 0),
+        quantidade_estabelecimentos: Number(
+          item.quantidade_estabelecimentos || 0,
+        ),
+      }));
+
+      // =====================================================
+      // MUNICÍPIOS
+      // =====================================================
+
+      const municipios = municipiosResultado.map((item) => ({
+        municipio_codigo: item.municipio_codigo,
+        municipio: item.municipio,
+        quantidade_empresas: Number(item.quantidade_empresas || 0),
+        quantidade_estabelecimentos: Number(
+          item.quantidade_estabelecimentos || 0,
+        ),
+        quantidade_matrizes: Number(item.quantidade_matrizes || 0),
+        quantidade_filiais: Number(item.quantidade_filiais || 0),
+      }));
+
+      // =====================================================
+      // TOP ATIVIDADES
+      // =====================================================
+
+      const topAtividades = topAtividadesResultado.map((item, index) => ({
+        posicao: index + 1,
+        cnae_codigo: item.cnae_codigo,
+        cnae_formatado: EmpresaControllers.formatarCnae(item.cnae_codigo),
+        cnae_descricao: item.cnae_descricao,
+        quantidade_empresas: Number(item.quantidade_empresas || 0),
+        quantidade_estabelecimentos: Number(
+          item.quantidade_estabelecimentos || 0,
+        ),
+        quantidade_matrizes: Number(item.quantidade_matrizes || 0),
+        quantidade_filiais: Number(item.quantidade_filiais || 0),
+      }));
+
+      // =====================================================
+      // EVOLUÇÃO
+      // =====================================================
+
+      const evolucao = evolucaoResultado.map((item) => ({
+        periodo: item.periodo,
+        quantidade_empresas: Number(item.quantidade_empresas || 0),
+        quantidade_estabelecimentos: Number(
+          item.quantidade_estabelecimentos || 0,
+        ),
+      }));
+
+      // =====================================================
+      // RESPONSE
+      // =====================================================
+
+      return res.status(200).json({
+        filtros: {
+          uf: filtros.uf,
+          competencia,
+          regiao: filtros.regiao || null,
+          municipio: filtros.municipio || null,
+          segmento: filtros.segmento || null,
+          situacao: filtros.situacao || null,
+          data_inicial: filtros.dataInicial || null,
+          data_final: filtros.dataFinal || null,
+          tipo_data: filtros.tipoData,
+        },
+
+        resumo,
+        situacoes,
+        segmentos,
+        municipios,
+        top_atividades: topAtividades,
+        evolucao,
+      });
+    } catch (error) {
+      console.error("Erro ao gerar indicadores:", error);
+
+      return res.status(error.status || 500).json({
+        message: error.message || "Erro ao gerar indicadores.",
       });
     }
   }

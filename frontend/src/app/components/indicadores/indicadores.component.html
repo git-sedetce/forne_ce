@@ -1,172 +1,1031 @@
 <main class="indicators-page">
-	<div class="indicators-container">
-		<header class="page-header">
-			<div>
-				<span class="eyebrow">Observatório empresarial</span>
-				<h1>Indicadores do Ceará</h1>
-				<p>
-					Uma leitura dos negócios ativos, das atividades econômicas e das
-					especializações produtivas do estado.
-				</p>
-			</div>
 
-			<div class="competence" *ngIf="competencia">
-				<span>Competência</span>
-				<strong>{{ competencia }}</strong>
-			</div>
-		</header>
+  <div class="indicators-container">
 
-		<div class="loading-state" *ngIf="carregando">
-			<i class="fa-solid fa-spinner fa-spin"></i>
-			<strong>Carregando indicadores...</strong>
-			<span>Estamos organizando os dados mais recentes do Ceará.</span>
-		</div>
+    <!-- =====================================================
+         CABEÇALHO
+    ====================================================== -->
 
-		<section class="error-state" *ngIf="erro && !carregando" role="alert">
-			<i class="fa-solid fa-circle-exclamation"></i>
-			<div>
-				<strong>Não foi possível carregar os indicadores</strong>
-				<span>{{ erro }}</span>
-			</div>
-			<button type="button" (click)="carregarIndicadores()">
-				<i class="fa-solid fa-rotate-right"></i>
-				Tentar novamente
-			</button>
-		</section>
+    <header class="page-header">
 
-		<ng-container *ngIf="!carregando && !erro">
-			<section class="metric-grid" aria-label="Resumo dos indicadores">
-				<article class="metric-card metric-blue">
-					<div class="metric-icon"><i class="fa-solid fa-building"></i></div>
-					<span>Empresas ativas</span>
-					<strong>{{ formatarNumero(resumo?.quantidade?.empresas) }}</strong>
-					<small>Empresas distintas no Ceará</small>
-				</article>
+      <div class="page-header-content">
 
-				<article class="metric-card metric-green">
-					<div class="metric-icon"><i class="fa-solid fa-store"></i></div>
-					<span>Estabelecimentos</span>
-					<strong>{{ formatarNumero(resumo?.quantidade?.estabelecimentos) }}</strong>
-					<small>Unidades em atividade</small>
-				</article>
+        <span class="eyebrow">
+          Observatório empresarial
+        </span>
 
-				<article class="metric-card metric-orange">
-					<div class="metric-icon"><i class="fa-solid fa-map-location-dot"></i></div>
-					<span>Municípios analisados</span>
-					<strong>{{ municipios.length || 0 }}</strong>
-					<small>Municípios com empresas ativas</small>
-				</article>
+        <h1>
+          Indicadores do Ceará
+        </h1>
 
-				<article class="metric-card metric-navy">
-					<div class="metric-icon"><i class="fa-solid fa-chart-line"></i></div>
-					<span>Filiais ativas</span>
-					<strong>{{ formatarNumero(resumo?.quantidade?.filiais) }}</strong>
-					<small>Presença operacional no estado</small>
-				</article>
-			</section>
+        <p>
+          Panorama do universo empresarial do Ceará,
+          com distribuição territorial, atividades econômicas,
+          situação cadastral e macrosegmentos.
+        </p>
 
-			<section class="dashboard-grid">
-				<article class="panel municipality-panel">
-					<header class="panel-header">
-						<div>
-							<span class="panel-kicker">Distribuição territorial</span>
-							<h2>Municípios com mais empresas</h2>
-						</div>
-						<i class="fa-solid fa-location-dot panel-mark"></i>
-					</header>
+      </div>
 
-					<div class="municipality-list" *ngIf="municipios.length; else noMunicipios">
-						<div class="municipality-row" *ngFor="let municipio of municipios; let i = index">
-							<span class="row-position">{{ i + 1 }}</span>
-							<div class="row-content">
-								<div class="row-label">
-									<strong>{{ municipio.municipio }}</strong>
-									<span>{{ formatarNumero(municipio.quantidade_empresas) }}</span>
-								</div>
-								<div class="bar-track">
-									<span [style.width.%]="percentualMunicipio(municipio.quantidade_empresas)"></span>
-								</div>
-							</div>
-						</div>
-					</div>
 
-					<ng-template #noMunicipios>
-						<p class="empty-state">Nenhum município encontrado.</p>
-					</ng-template>
-				</article>
+      <div class="header-actions">
 
-				<article class="panel cnae-panel">
-					<header class="panel-header">
-						<div>
-							<span class="panel-kicker">Atividade econômica</span>
-							<h2>Principais CNAEs</h2>
-						</div>
-						<i class="fa-solid fa-ranking-star panel-mark"></i>
-					</header>
+        <div class="competencia-badge" *ngIf="competencia">
 
-					<div class="table-wrapper">
-						<table *ngIf="cnaes.length; else noCnaes">
-							<thead>
-								<tr>
-									<th>Pos.</th>
-									<th>Atividade</th>
-									<th class="number-cell">Empresas</th>
-								</tr>
-							</thead>
-							<tbody>
-								<tr *ngFor="let cnae of cnaes; let i = index">
-									<td><span class="table-position">{{ i + 1 }}</span></td>
-									<td>
-										<strong>{{ cnae.cnae_descricao }}</strong>
-										<small>{{ cnae.cnae_formatado || formatarCnae(cnae.cnae_codigo) }}</small>
-									</td>
-									<td class="number-cell"><strong>{{ formatarNumero(cnae.quantidade_empresas) }}</strong></td>
-								</tr>
-							</tbody>
-						</table>
-					</div>
-					<ng-template #noCnaes>
-						<p class="empty-state">Nenhuma atividade encontrada.</p>
-					</ng-template>
-				</article>
-			</section>
+          <span>
+            Competência
+          </span>
 
-			<section class="panel specialization-panel">
-				<header class="panel-header specialization-header">
-					<div>
-						<span class="panel-kicker">Quociente locacional</span>
-						<h2>Especializações produtivas do Ceará</h2>
-						<p>
-							Atividades com maior concentração relativa em um município,
-							comparadas à estrutura econômica estadual.
-						</p>
-					</div>
-					<div class="ql-legend"><strong>QL</strong><span>maior concentração</span></div>
-				</header>
+          <strong>
+            {{ competencia }}
+          </strong>
 
-				<div class="specialization-list" *ngIf="especializacoes.length; else noEspecializacoes">
-					<article class="specialization-item" *ngFor="let item of especializacoes; let i = index">
-						<span class="specialization-rank">{{ (i + 1).toString().padStart(2, '0') }}</span>
-						<div class="specialization-main">
-							<strong>{{ item.cnae_descricao }}</strong>
-							<span>{{ item.municipio_nome }} · {{ item.cnae_codigo }}</span>
-						</div>
-						<div class="specialization-value">
-							<strong>{{ formatarQl(item.cociente_locacional) }}</strong>
-							<span>quociente</span>
-						</div>
-					</article>
-				</div>
+        </div>
 
-				<ng-template #noEspecializacoes>
-					<p class="empty-state">Nenhum quociente locacional encontrado.</p>
-				</ng-template>
-			</section>
+        <button type="button" class="btn-exportar" disabled title="A exportação PDF será implementada na próxima etapa">
 
-			<footer class="data-note">
-				<i class="fa-solid fa-circle-info"></i>
-				<span>Os indicadores consideram estabelecimentos com situação cadastral ativa na competência apresentada.</span>
-			</footer>
-		</ng-container>
-	</div>
+          <i class="fa-solid fa-file-pdf"></i>
+
+          Exportar PDF
+
+        </button>
+
+      </div>
+
+    </header>
+
+
+    <!-- =====================================================
+         FILTROS
+    ====================================================== -->
+
+    <section class="filters-panel">
+
+      <div class="section-heading">
+
+        <div>
+
+          <span class="section-eyebrow">
+            Consulta
+          </span>
+
+          <h2>
+            Filtros dos indicadores
+          </h2>
+
+        </div>
+
+
+        <button *ngIf="possuiFiltrosAtivos" type="button" class="btn-clear" (click)="limparFiltros()">
+
+          <i class="fa-solid fa-rotate-left"></i>
+
+          Limpar filtros
+
+        </button>
+
+      </div>
+
+
+      <div class="filters-grid">
+
+        <!-- REGIÃO -->
+
+        <div class="filter-field">
+
+          <label for="regiao">
+            Região
+          </label>
+
+          <select id="regiao" name="regiao" [(ngModel)]="filtros.regiao" (ngModelChange)="onRegiaoChange()">
+
+            <option value="">
+              Todas as regiões
+            </option>
+
+            <option *ngFor="let regiao of regioes" [value]="regiao">
+              {{ regiao }}
+            </option>
+
+          </select>
+
+        </div>
+
+
+        <!-- MUNICÍPIO -->
+
+        <div class="filter-field">
+
+          <label for="municipio">
+            Município
+          </label>
+
+          <select id="municipio" name="municipio" [(ngModel)]="filtros.municipio" [disabled]="!filtros.regiao">
+
+            <option value="">
+              {{
+              filtros.regiao
+              ? 'Todos os municípios'
+              : 'Selecione uma região'
+              }}
+            </option>
+
+            <option *ngFor="let municipio of municipiosFiltro" [value]="municipio">
+              {{ municipio }}
+            </option>
+
+          </select>
+
+        </div>
+
+
+        <!-- SEGMENTO -->
+
+        <div class="filter-field">
+
+          <label for="segmento">
+            Macrosegmento
+          </label>
+
+          <select id="segmento" name="segmento" [(ngModel)]="filtros.segmento">
+
+            <option *ngFor="let segmento of segmentosEconomicos" [value]="segmento.codigo">
+              {{ segmento.descricao }}
+            </option>
+
+          </select>
+
+        </div>
+
+
+        <!-- SITUAÇÃO -->
+
+        <div class="filter-field">
+
+          <label for="situacao">
+            Situação cadastral
+          </label>
+
+          <select id="situacao" name="situacao" [(ngModel)]="filtros.situacao">
+
+            <option *ngFor="let situacao of situacoesCadastrais" [value]="situacao.codigo">
+              {{ situacao.descricao }}
+            </option>
+
+          </select>
+
+        </div>
+
+
+        <!-- TIPO DATA -->
+
+        <div class="filter-field">
+
+          <label for="tipoData">
+            Referência do período
+          </label>
+
+          <select id="tipoData" name="tipoData" [(ngModel)]="filtros.tipoData">
+
+            <option *ngFor="let tipo of tiposData" [value]="tipo.codigo">
+              {{ tipo.descricao }}
+            </option>
+
+          </select>
+
+        </div>
+
+
+        <!-- DATA INICIAL -->
+
+        <div class="filter-field">
+
+          <label for="dataInicial">
+            Data inicial
+          </label>
+
+          <input id="dataInicial" name="dataInicial" type="date" [(ngModel)]="filtros.dataInicial" />
+
+        </div>
+
+
+        <!-- DATA FINAL -->
+
+        <div class="filter-field">
+
+          <label for="dataFinal">
+            Data final
+          </label>
+
+          <input id="dataFinal" name="dataFinal" type="date" [(ngModel)]="filtros.dataFinal" />
+
+        </div>
+
+
+        <!-- BOTÃO -->
+
+        <div class="filter-action">
+
+          <button type="button" class="btn-filter" [disabled]="carregando" (click)="aplicarFiltros()">
+
+            <i class="fa-solid fa-filter"></i>
+
+            Aplicar filtros
+
+          </button>
+
+        </div>
+
+      </div>
+
+
+      <div class="filter-info" *ngIf="
+          filtros.dataInicial ||
+          filtros.dataFinal
+        ">
+
+        <i class="fa-solid fa-circle-info"></i>
+
+        <span>
+          O período está sendo aplicado sobre:
+          <strong>
+            {{ descricaoTipoData }}
+          </strong>.
+        </span>
+
+      </div>
+
+    </section>
+
+
+    <!-- =====================================================
+         ERRO
+    ====================================================== -->
+
+    <div class="alert-error" *ngIf="erro">
+
+      <i class="fa-solid fa-triangle-exclamation"></i>
+
+      <span>
+        {{ erro }}
+      </span>
+
+    </div>
+
+
+    <!-- =====================================================
+         LOADING
+    ====================================================== -->
+
+    <div class="loading-state" *ngIf="carregando">
+
+      <div class="spinner"></div>
+
+      <strong>
+        Carregando indicadores...
+      </strong>
+
+      <span>
+        Aguarde enquanto os dados são processados.
+      </span>
+
+    </div>
+
+
+    <!-- =====================================================
+         CONTEÚDO
+    ====================================================== -->
+
+    <ng-container *ngIf="!carregando && resumo">
+
+      <!-- ===================================================
+           CARDS PRINCIPAIS
+      ==================================================== -->
+
+      <section class="summary-grid">
+
+        <article class="summary-card">
+
+          <div class="summary-icon">
+            <i class="fa-solid fa-building"></i>
+          </div>
+
+          <div>
+
+            <span>
+              Empresas
+            </span>
+
+            <strong>
+              {{ formatarNumero(resumo.empresas) }}
+            </strong>
+
+            <small>
+              CNPJs básicos distintos
+            </small>
+
+          </div>
+
+        </article>
+
+
+        <article class="summary-card">
+
+          <div class="summary-icon">
+            <i class="fa-solid fa-store"></i>
+          </div>
+
+          <div>
+
+            <span>
+              Estabelecimentos
+            </span>
+
+            <strong>
+              {{ formatarNumero(resumo.estabelecimentos) }}
+            </strong>
+
+            <small>
+              Matrizes e filiais
+            </small>
+
+          </div>
+
+        </article>
+
+
+        <article class="summary-card">
+
+          <div class="summary-icon">
+            <i class="fa-solid fa-location-dot"></i>
+          </div>
+
+          <div>
+
+            <span>
+              Municípios
+            </span>
+
+            <strong>
+              {{ formatarNumero(resumo.municipios) }}
+            </strong>
+
+            <small>
+              Municípios no recorte
+            </small>
+
+          </div>
+
+        </article>
+
+
+        <article class="summary-card">
+
+          <div class="summary-icon">
+            <i class="fa-solid fa-briefcase"></i>
+          </div>
+
+          <div>
+
+            <span>
+              Atividades CNAE
+            </span>
+
+            <strong>
+              {{ formatarNumero(resumo.cnaes) }}
+            </strong>
+
+            <small>
+              CNAEs principais distintos
+            </small>
+
+          </div>
+
+        </article>
+
+
+        <article class="summary-card">
+
+          <div class="summary-icon">
+            <i class="fa-solid fa-house-chimney"></i>
+          </div>
+
+          <div>
+
+            <span>
+              Matrizes
+            </span>
+
+            <strong>
+              {{ formatarNumero(resumo.matrizes) }}
+            </strong>
+
+            <small>
+              Estabelecimentos matriz
+            </small>
+
+          </div>
+
+        </article>
+
+
+        <article class="summary-card">
+
+          <div class="summary-icon">
+            <i class="fa-solid fa-code-branch"></i>
+          </div>
+
+          <div>
+
+            <span>
+              Filiais
+            </span>
+
+            <strong>
+              {{ formatarNumero(resumo.filiais) }}
+            </strong>
+
+            <small>
+              Estabelecimentos filial
+            </small>
+
+          </div>
+
+        </article>
+
+      </section>
+
+
+      <!-- ===================================================
+           SITUAÇÃO CADASTRAL
+      ==================================================== -->
+
+      <section class="status-section">
+
+        <div class="section-heading">
+
+          <div>
+
+            <span class="section-eyebrow">
+              Receita Federal
+            </span>
+
+            <h2>
+              Situação cadastral
+            </h2>
+
+          </div>
+
+        </div>
+
+
+        <div class="status-grid">
+
+          <article class="status-card status-active">
+
+            <span>
+              Ativas
+            </span>
+
+            <strong>
+              {{
+              formatarNumero(
+              quantidadeSituacao('02')
+              )
+              }}
+            </strong>
+
+            <small>
+              Estabelecimentos
+            </small>
+
+          </article>
+
+
+          <article class="status-card status-closed">
+
+            <span>
+              Baixadas
+            </span>
+
+            <strong>
+              {{
+              formatarNumero(
+              quantidadeSituacao('08')
+              )
+              }}
+            </strong>
+
+            <small>
+              Estabelecimentos
+            </small>
+
+          </article>
+
+
+          <article class="status-card status-unfit">
+
+            <span>
+              Inaptas
+            </span>
+
+            <strong>
+              {{
+              formatarNumero(
+              quantidadeSituacao('04')
+              )
+              }}
+            </strong>
+
+            <small>
+              Estabelecimentos
+            </small>
+
+          </article>
+
+
+          <article class="status-card status-suspended">
+
+            <span>
+              Suspensas
+            </span>
+
+            <strong>
+              {{
+              formatarNumero(
+              quantidadeSituacao('03')
+              )
+              }}
+            </strong>
+
+            <small>
+              Estabelecimentos
+            </small>
+
+          </article>
+
+
+          <article class="status-card status-null">
+
+            <span>
+              Nulas
+            </span>
+
+            <strong>
+              {{
+              formatarNumero(
+              quantidadeSituacao('01')
+              )
+              }}
+            </strong>
+
+            <small>
+              Estabelecimentos
+            </small>
+
+          </article>
+
+        </div>
+
+      </section>
+
+
+      <!-- ===================================================
+           SEGMENTOS + SITUAÇÕES
+      ==================================================== -->
+
+      <section class="charts-grid">
+
+        <article class="dashboard-panel">
+
+          <div class="panel-header">
+
+            <div>
+
+              <span class="section-eyebrow">
+                Estrutura econômica
+              </span>
+
+              <h2>
+                Estabelecimentos por macrosegmento
+              </h2>
+
+            </div>
+
+          </div>
+
+
+          <apx-chart *ngIf="segmentos.length" [series]="chartSegmentos.series!" [colors]="chartSegmentos.colors!" [chart]="chartSegmentos.chart!"
+            [labels]="chartSegmentos.labels!" [legend]="chartSegmentos.legend!"
+            [dataLabels]="chartSegmentos.dataLabels!" [plotOptions]="chartSegmentos.plotOptions!"
+            [tooltip]="chartSegmentos.tooltip!">
+          </apx-chart>
+
+        </article>
+
+
+        <article class="dashboard-panel">
+
+          <div class="panel-header">
+
+            <div>
+
+              <span class="section-eyebrow">
+                Cadastro
+              </span>
+
+              <h2>
+                Distribuição por situação cadastral
+              </h2>
+
+            </div>
+
+          </div>
+
+
+          <apx-chart *ngIf="situacoes.length" [series]="chartSituacoes.series!" [chart]="chartSituacoes.chart!"
+            [labels]="chartSituacoes.labels!" [legend]="chartSituacoes.legend!" [colors]="chartSegmentos.colors!"
+            [dataLabels]="chartSituacoes.dataLabels!" [plotOptions]="chartSituacoes.plotOptions!"
+            [tooltip]="chartSituacoes.tooltip!">
+          </apx-chart>
+
+        </article>
+
+      </section>
+
+
+      <!-- ===================================================
+           EVOLUÇÃO
+      ==================================================== -->
+
+      <section class="dashboard-panel panel-full">
+
+        <div class="panel-header">
+
+          <div>
+
+            <span class="section-eyebrow">
+              Série temporal
+            </span>
+
+            <h2>
+              {{
+              filtros.tipoData ===
+              'SITUACAO_CADASTRAL'
+              ? 'Registros por data da situação cadastral'
+              : 'Início das atividades'
+              }}
+            </h2>
+
+            <p>
+              {{
+              filtros.tipoData ===
+              'SITUACAO_CADASTRAL'
+              ? 'Distribuição dos registros conforme a data associada à situação cadastral atual.'
+              : 'Quantidade de estabelecimentos segundo o período de início da atividade.'
+              }}
+            </p>
+
+          </div>
+
+        </div>
+
+
+        <apx-chart *ngIf="evolucao.length" [series]="chartEvolucao.series!" [chart]="chartEvolucao.chart!" [colors]="chartSegmentos.colors!"
+          [xaxis]="chartEvolucao.xaxis!" [yaxis]="chartEvolucao.yaxis!" [dataLabels]="chartEvolucao.dataLabels!"
+          [stroke]="chartEvolucao.stroke!" [fill]="chartEvolucao.fill!" [tooltip]="chartEvolucao.tooltip!">
+        </apx-chart>
+
+      </section>
+
+
+      <!-- ===================================================
+           MUNICÍPIOS + ATIVIDADES
+      ==================================================== -->
+
+      <section class="charts-grid">
+
+        <!-- MUNICÍPIOS -->
+
+        <article class="dashboard-panel">
+
+          <div class="panel-header">
+
+            <div>
+
+              <span class="section-eyebrow">
+                Distribuição territorial
+              </span>
+
+              <h2>
+                Top 10 municípios
+              </h2>
+
+              <p>
+                Municípios com maior quantidade de
+                estabelecimentos no recorte atual.
+              </p>
+
+            </div>
+
+          </div>
+
+
+          <apx-chart *ngIf="topMunicipios.length" [series]="chartMunicipios.series!" [chart]="chartMunicipios.chart!" [colors]="chartSegmentos.colors!"
+            [xaxis]="chartMunicipios.xaxis!" [yaxis]="chartMunicipios.yaxis!" [dataLabels]="chartMunicipios.dataLabels!"
+            [plotOptions]="chartMunicipios.plotOptions!" [tooltip]="chartMunicipios.tooltip!">
+          </apx-chart>
+
+        </article>
+
+
+        <!-- ATIVIDADES -->
+
+        <article class="dashboard-panel">
+
+          <div class="panel-header">
+
+            <div>
+
+              <span class="section-eyebrow">
+                Atividade econômica
+              </span>
+
+              <h2>
+                Top 10 atividades
+              </h2>
+
+              <p>
+                CNAEs principais com maior número de
+                estabelecimentos.
+              </p>
+
+            </div>
+
+          </div>
+
+
+          <apx-chart *ngIf="topAtividades.length" [series]="chartAtividades.series!" [chart]="chartAtividades.chart!" [colors]="chartSegmentos.colors!"
+            [xaxis]="chartAtividades.xaxis!" [yaxis]="chartAtividades.yaxis!" [dataLabels]="chartAtividades.dataLabels!"
+            [plotOptions]="chartAtividades.plotOptions!" [tooltip]="chartAtividades.tooltip!">
+          </apx-chart>
+
+        </article>
+
+      </section>
+
+
+      <!-- ===================================================
+           TABELA TOP ATIVIDADES
+      ==================================================== -->
+
+      <section class="dashboard-panel panel-full">
+
+        <div class="panel-header">
+
+          <div>
+
+            <span class="section-eyebrow">
+              Detalhamento
+            </span>
+
+            <h2>
+              Principais atividades econômicas
+            </h2>
+
+          </div>
+
+        </div>
+
+
+        <div class="table-responsive">
+
+          <table class="indicators-table">
+
+            <thead>
+
+              <tr>
+
+                <th>
+                  #
+                </th>
+
+                <th>
+                  CNAE
+                </th>
+
+                <th>
+                  Atividade econômica
+                </th>
+
+                <th class="text-right">
+                  Empresas
+                </th>
+
+                <th class="text-right">
+                  Estabelecimentos
+                </th>
+
+              </tr>
+
+            </thead>
+
+
+            <tbody>
+
+              <tr *ngFor="
+                  let atividade of topAtividades;
+                  let i = index
+                ">
+
+                <td>
+                  <span class="ranking">
+                    {{ i + 1 }}
+                  </span>
+                </td>
+
+                <td>
+
+                  <strong class="cnae-code">
+                    {{
+                    atividade.cnae_formatado ||
+                    formatarCnae(
+                    atividade.cnae_codigo
+                    )
+                    }}
+                  </strong>
+
+                </td>
+
+                <td>
+                  {{ atividade.cnae_descricao }}
+                </td>
+
+                <td class="text-right">
+                  {{
+                  formatarNumero(
+                  atividade.quantidade_empresas
+                  )
+                  }}
+                </td>
+
+                <td class="text-right">
+
+                  <strong>
+                    {{
+                    formatarNumero(
+                    atividade.quantidade_estabelecimentos
+                    )
+                    }}
+                  </strong>
+
+                </td>
+
+              </tr>
+
+            </tbody>
+
+          </table>
+
+        </div>
+
+      </section>
+
+
+      <!-- ===================================================
+           QUOCIENTE LOCACIONAL
+      ==================================================== -->
+
+      <section class="dashboard-panel panel-full ql-panel">
+
+        <div class="panel-header">
+
+          <div>
+
+            <span class="section-eyebrow">
+              Especialização econômica
+            </span>
+
+            <h2>
+              Quociente Locacional
+            </h2>
+
+            <p>
+              Atividades com maior concentração relativa
+              nos municípios cearenses.
+            </p>
+
+          </div>
+
+        </div>
+
+
+        <div class="table-responsive">
+
+          <table class="indicators-table">
+
+            <thead>
+
+              <tr>
+
+                <th>
+                  Município
+                </th>
+
+                <th>
+                  CNAE
+                </th>
+
+                <th>
+                  Atividade
+                </th>
+
+                <th class="text-right">
+                  QL
+                </th>
+
+              </tr>
+
+            </thead>
+
+
+            <tbody>
+
+              <tr *ngFor="
+                  let item of especializacoes
+                ">
+
+                <td>
+                  {{ item.municipio }}
+                </td>
+
+                <td>
+
+                  <strong class="cnae-code">
+                    {{
+                    formatarCnae(
+                    item.cnae_codigo
+                    )
+                    }}
+                  </strong>
+
+                </td>
+
+                <td>
+                  {{ item.cnae_descricao }}
+                </td>
+
+                <td class="text-right">
+
+                  <span class="ql-value">
+                    {{
+                    formatarQl(
+                    item.ql
+                    )
+                    }}
+                  </span>
+
+                </td>
+
+              </tr>
+
+            </tbody>
+
+          </table>
+
+        </div>
+
+      </section>
+
+
+      <!-- ===================================================
+           NOTA METODOLÓGICA
+      ==================================================== -->
+
+      <footer class="methodology-note">
+
+        <i class="fa-solid fa-circle-info"></i>
+
+        <div>
+
+          <strong>
+            Nota sobre os indicadores
+          </strong>
+
+          <p>
+            Empresas representam CNPJs básicos distintos.
+            Distribuições territoriais, CNAE, segmento e
+            situação cadastral utilizam estabelecimentos
+            como unidade principal de análise.
+            Os dados correspondem à competência
+            <strong>{{ competencia }}</strong>.
+          </p>
+
+        </div>
+
+      </footer>
+
+    </ng-container>
+
+  </div>
+
 </main>

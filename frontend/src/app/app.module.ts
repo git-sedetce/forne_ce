@@ -23,6 +23,7 @@ import { authInterceptor } from './services/interceptors/auth.interceptor';
 import { ConsultaEmpresasComponent } from './components/empresa/consulta-empresas/consulta-empresas.component';
 import { SobreComponent } from './components/sobre/sobre.component';
 import { IndicadoresComponent } from './components/indicadores/indicadores.component';
+import { NgApexchartsModule } from 'ng-apexcharts';
 
 @NgModule({
   declarations: [
@@ -38,7 +39,7 @@ import { IndicadoresComponent } from './components/indicadores/indicadores.compo
     ListaUsuariosComponent,
     ConsultaEmpresasComponent,
     SobreComponent,
-    IndicadoresComponent
+    IndicadoresComponent,
   ],
   imports: [
     BrowserModule,
@@ -48,6 +49,7 @@ import { IndicadoresComponent } from './components/indicadores/indicadores.compo
     FormsModule,
     ReactiveFormsModule,
     NgxPaginationModule,
+    NgApexchartsModule,
 
     ToastrModule.forRoot({
       positionClass: 'toast-top-right',
