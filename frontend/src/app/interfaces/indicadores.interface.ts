@@ -33,11 +33,10 @@ export interface IndicadorCnae {
 }
 
 export interface IndicadorLocacional {
-  id?: number;
+  id: string | number;
   competencia: string;
   municipio_codigo: string;
-  municipio: string;
-  ql: number | string;
+  municipio_nome: string;
   cnae_codigo: string;
   cnae_descricao: string;
   cociente_locacional: number | string;
@@ -70,6 +69,13 @@ export interface RespostaCnaesIndicadores {
 
 export interface RespostaLocacional {
   competencia: string | null;
+  competencia_automatica: boolean;
+  filtros: {
+    municipio: string | null;
+    municipio_codigo: string | null;
+    cnae: string | null;
+    ql_min: number | string | null;
+  };
   paginacao: {
     pagina: number;
     limite: number;

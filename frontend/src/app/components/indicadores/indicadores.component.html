@@ -1,5 +1,4 @@
 <main class="indicators-page">
-
   <div class="indicators-container">
 
     <!-- =====================================================
@@ -7,50 +6,34 @@
     ====================================================== -->
 
     <header class="page-header">
-
       <div class="page-header-content">
-
         <span class="eyebrow">
           Observatório empresarial
         </span>
-
         <h1>
           Indicadores do Ceará
         </h1>
-
         <p>
           Panorama do universo empresarial do Ceará,
           com distribuição territorial, atividades econômicas,
           situação cadastral e macrosegmentos.
         </p>
-
       </div>
 
-
       <div class="header-actions">
-
         <div class="competencia-badge" *ngIf="competencia">
-
           <span>
             Competência
           </span>
-
           <strong>
             {{ competencia }}
           </strong>
-
         </div>
-
-        <button type="button" class="btn-exportar" disabled title="A exportação PDF será implementada na próxima etapa">
-
+        <button type="button" class="btn-exportar" [disabled]="carregando || !resumo" (click)="exportarPdf()">
           <i class="fa-solid fa-file-pdf"></i>
-
           Exportar PDF
-
         </button>
-
       </div>
-
     </header>
 
 
@@ -614,8 +597,8 @@
           </div>
 
 
-          <apx-chart *ngIf="segmentos.length" [series]="chartSegmentos.series!" [colors]="chartSegmentos.colors!" [chart]="chartSegmentos.chart!"
-            [labels]="chartSegmentos.labels!" [legend]="chartSegmentos.legend!"
+          <apx-chart *ngIf="segmentos.length" [series]="chartSegmentos.series!" [colors]="chartSegmentos.colors!"
+            [chart]="chartSegmentos.chart!" [labels]="chartSegmentos.labels!" [legend]="chartSegmentos.legend!"
             [dataLabels]="chartSegmentos.dataLabels!" [plotOptions]="chartSegmentos.plotOptions!"
             [tooltip]="chartSegmentos.tooltip!">
           </apx-chart>
@@ -690,9 +673,10 @@
         </div>
 
 
-        <apx-chart *ngIf="evolucao.length" [series]="chartEvolucao.series!" [chart]="chartEvolucao.chart!" [colors]="chartSegmentos.colors!"
-          [xaxis]="chartEvolucao.xaxis!" [yaxis]="chartEvolucao.yaxis!" [dataLabels]="chartEvolucao.dataLabels!"
-          [stroke]="chartEvolucao.stroke!" [fill]="chartEvolucao.fill!" [tooltip]="chartEvolucao.tooltip!">
+        <apx-chart *ngIf="evolucao.length" [series]="chartEvolucao.series!" [chart]="chartEvolucao.chart!"
+          [colors]="chartSegmentos.colors!" [xaxis]="chartEvolucao.xaxis!" [yaxis]="chartEvolucao.yaxis!"
+          [dataLabels]="chartEvolucao.dataLabels!" [stroke]="chartEvolucao.stroke!" [fill]="chartEvolucao.fill!"
+          [tooltip]="chartEvolucao.tooltip!">
         </apx-chart>
 
       </section>
@@ -730,9 +714,10 @@
           </div>
 
 
-          <apx-chart *ngIf="topMunicipios.length" [series]="chartMunicipios.series!" [chart]="chartMunicipios.chart!" [colors]="chartSegmentos.colors!"
-            [xaxis]="chartMunicipios.xaxis!" [yaxis]="chartMunicipios.yaxis!" [dataLabels]="chartMunicipios.dataLabels!"
-            [plotOptions]="chartMunicipios.plotOptions!" [tooltip]="chartMunicipios.tooltip!">
+          <apx-chart *ngIf="topMunicipios.length" [series]="chartMunicipios.series!" [chart]="chartMunicipios.chart!"
+            [colors]="chartSegmentos.colors!" [xaxis]="chartMunicipios.xaxis!" [yaxis]="chartMunicipios.yaxis!"
+            [dataLabels]="chartMunicipios.dataLabels!" [plotOptions]="chartMunicipios.plotOptions!"
+            [tooltip]="chartMunicipios.tooltip!">
           </apx-chart>
 
         </article>
@@ -764,9 +749,10 @@
           </div>
 
 
-          <apx-chart *ngIf="topAtividades.length" [series]="chartAtividades.series!" [chart]="chartAtividades.chart!" [colors]="chartSegmentos.colors!"
-            [xaxis]="chartAtividades.xaxis!" [yaxis]="chartAtividades.yaxis!" [dataLabels]="chartAtividades.dataLabels!"
-            [plotOptions]="chartAtividades.plotOptions!" [tooltip]="chartAtividades.tooltip!">
+          <apx-chart *ngIf="topAtividades.length" [series]="chartAtividades.series!" [chart]="chartAtividades.chart!"
+            [colors]="chartSegmentos.colors!" [xaxis]="chartAtividades.xaxis!" [yaxis]="chartAtividades.yaxis!"
+            [dataLabels]="chartAtividades.dataLabels!" [plotOptions]="chartAtividades.plotOptions!"
+            [tooltip]="chartAtividades.tooltip!">
           </apx-chart>
 
         </article>
@@ -892,15 +878,12 @@
 
 
       <!-- ===================================================
-           QUOCIENTE LOCACIONAL
-      ==================================================== -->
+     QUOCIENTE LOCACIONAL
+     ==================================================== -->
 
       <section class="dashboard-panel panel-full ql-panel">
-
         <div class="panel-header">
-
           <div>
-
             <span class="section-eyebrow">
               Especialização econômica
             </span>
@@ -910,90 +893,79 @@
             </h2>
 
             <p>
-              Atividades com maior concentração relativa
-              nos municípios cearenses.
+              Atividades com maior concentração relativa nos municípios em comparação com a estrutura econômica do
+              Ceará.
             </p>
-
           </div>
-
         </div>
 
 
-        <div class="table-responsive">
-
+        <div class="table-responsive" *ngIf="especializacoes.length; else semQl">
           <table class="indicators-table">
-
             <thead>
-
               <tr>
-
                 <th>
                   Município
                 </th>
-
                 <th>
                   CNAE
                 </th>
-
                 <th>
                   Atividade
                 </th>
-
+                <th class="text-right">
+                  Empresas
+                </th>
                 <th class="text-right">
                   QL
                 </th>
-
               </tr>
-
             </thead>
 
-
             <tbody>
-
-              <tr *ngFor="
-                  let item of especializacoes
-                ">
-
+              <tr *ngFor="let item of especializacoes">
                 <td>
-                  {{ item.municipio }}
+                  {{ formatarNomeMunicipio(item.municipio_nome) }}
                 </td>
-
                 <td>
-
                   <strong class="cnae-code">
-                    {{
-                    formatarCnae(
-                    item.cnae_codigo
-                    )
-                    }}
+                    {{ formatarCnae(item.cnae_codigo) }}
                   </strong>
-
                 </td>
-
                 <td>
                   {{ item.cnae_descricao }}
                 </td>
-
                 <td class="text-right">
-
-                  <span class="ql-value">
-                    {{
-                    formatarQl(
-                    item.ql
-                    )
-                    }}
-                  </span>
-
+                  {{ formatarNumero(item.empresas_municipio_cnae) }}
                 </td>
-
+                <td class="text-right">
+                  <span class="ql-value">
+                    {{ formatarQl(item.cociente_locacional) }}
+                  </span>
+                </td>
               </tr>
-
             </tbody>
-
           </table>
-
+          <div class="ql-info">
+            <i class="fa-solid fa-circle-info"></i>
+            <span>
+              QL superior a 1 indica concentração relativa da atividade
+              no município acima da participação observada no estado.
+              Valores elevados podem ocorrer em atividades com poucos
+              estabelecimentos.
+            </span>
+          </div>
         </div>
 
+
+        <ng-template #semQl>
+          <div class="empty-state">
+            <i class="fa-solid fa-chart-column"></i>
+            <span>
+              Nenhum dado de Quociente Locacional encontrado.
+            </span>
+          </div>
+        </ng-template>
       </section>
 
 
@@ -1002,15 +974,11 @@
       ==================================================== -->
 
       <footer class="methodology-note">
-
         <i class="fa-solid fa-circle-info"></i>
-
         <div>
-
           <strong>
             Nota sobre os indicadores
           </strong>
-
           <p>
             Empresas representam CNPJs básicos distintos.
             Distribuições territoriais, CNAE, segmento e
@@ -1019,13 +987,8 @@
             Os dados correspondem à competência
             <strong>{{ competencia }}</strong>.
           </p>
-
         </div>
-
       </footer>
-
     </ng-container>
-
   </div>
-
 </main>
