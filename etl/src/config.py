@@ -88,6 +88,44 @@ if mes < 1 or mes > 12:
         f"{COMPETENCIA}"
     )
 
+# ============================================================
+# COMPETÊNCIA - JUNTA COMERCIAL
+# ============================================================
+
+COMPETENCIA_JUNTA = obter_variavel(
+    "COMPETENCIA_JUNTA"
+)
+
+
+# Validação simples do formato YYYY-MM
+
+if (
+    len(COMPETENCIA_JUNTA) != 7
+    or COMPETENCIA_JUNTA[4] != "-"
+    or not COMPETENCIA_JUNTA[:4].isdigit()
+    or not COMPETENCIA_JUNTA[5:].isdigit()
+):
+    raise RuntimeError(
+        "COMPETENCIA_JUNTA deve possuir o formato YYYY-MM. "
+        f"Valor informado: {COMPETENCIA_JUNTA}"
+    )
+
+
+ano_junta = int(
+    COMPETENCIA_JUNTA[:4]
+)
+
+mes_junta = int(
+    COMPETENCIA_JUNTA[5:]
+)
+
+
+if mes_junta < 1 or mes_junta > 12:
+    raise RuntimeError(
+        "Mês inválido em COMPETENCIA_JUNTA: "
+        f"{COMPETENCIA_JUNTA}"
+    )
+
 
 # ============================================================
 # POSTGRESQL
