@@ -30,11 +30,9 @@ CREATE SCHEMA IF NOT EXISTS staging;
 CREATE TABLE IF NOT EXISTS staging.cnaes (
 
     codigo TEXT,
-
     descricao TEXT
 
 );
-
 
 -- =====================================================================
 -- MOTIVOS DA SITUAÇÃO CADASTRAL
@@ -43,11 +41,9 @@ CREATE TABLE IF NOT EXISTS staging.cnaes (
 CREATE TABLE IF NOT EXISTS staging.motivos (
 
     codigo TEXT,
-
     descricao TEXT
 
 );
-
 
 -- =====================================================================
 -- MUNICÍPIOS
@@ -56,11 +52,9 @@ CREATE TABLE IF NOT EXISTS staging.motivos (
 CREATE TABLE IF NOT EXISTS staging.municipios (
 
     codigo TEXT,
-
     nome TEXT
 
 );
-
 
 -- =====================================================================
 -- NATUREZAS JURÍDICAS
@@ -69,11 +63,9 @@ CREATE TABLE IF NOT EXISTS staging.municipios (
 CREATE TABLE IF NOT EXISTS staging.naturezas (
 
     codigo TEXT,
-
     descricao TEXT
 
 );
-
 
 -- =====================================================================
 -- PAÍSES
@@ -82,11 +74,9 @@ CREATE TABLE IF NOT EXISTS staging.naturezas (
 CREATE TABLE IF NOT EXISTS staging.paises (
 
     codigo TEXT,
-
     nome TEXT
 
 );
-
 
 -- =====================================================================
 -- QUALIFICAÇÕES
@@ -95,11 +85,9 @@ CREATE TABLE IF NOT EXISTS staging.paises (
 CREATE TABLE IF NOT EXISTS staging.qualificacoes (
 
     codigo TEXT,
-
     descricao TEXT
 
 );
-
 
 -- =====================================================================
 -- EMPRESAS
@@ -119,21 +107,14 @@ CREATE TABLE IF NOT EXISTS staging.qualificacoes (
 CREATE TABLE IF NOT EXISTS staging.empresas (
 
     cnpj_basico TEXT,
-
     razao_social TEXT,
-
     natureza_juridica_codigo TEXT,
-
     qualificacao_responsavel_codigo TEXT,
-
     capital_social TEXT,
-
     porte_codigo TEXT,
-
     ente_federativo_responsavel TEXT
 
 );
-
 
 -- =====================================================================
 -- ESTABELECIMENTOS
@@ -148,67 +129,37 @@ CREATE TABLE IF NOT EXISTS staging.empresas (
 CREATE TABLE IF NOT EXISTS staging.estabelecimentos (
 
     cnpj_basico TEXT,
-
     cnpj_ordem TEXT,
-
     cnpj_dv TEXT,
-
     identificador_matriz_filial TEXT,
-
     nome_fantasia TEXT,
-
     situacao_cadastral_codigo TEXT,
-
     data_situacao_cadastral TEXT,
-
     motivo_situacao_codigo TEXT,
-
     nome_cidade_exterior TEXT,
-
     pais_codigo TEXT,
-
     data_inicio_atividade TEXT,
-
     cnae_principal_codigo TEXT,
-
     cnae_secundario_codigo TEXT,
-
     tipo_logradouro TEXT,
-
     logradouro TEXT,
-
     numero TEXT,
-
     complemento TEXT,
-
     bairro TEXT,
-
     cep TEXT,
-
     uf TEXT,
-
     municipio_codigo TEXT,
-
     ddd_1 TEXT,
-
     telefone_1 TEXT,
-
     ddd_2 TEXT,
-
     telefone_2 TEXT,
-
     fax TEXT,
-
     email TEXT,
-
     situacao_especial TEXT,
-
     data_situacao_especial TEXT,
-
     campo_30 TEXT
 
 );
-
 
 -- =====================================================================
 -- SÓCIOS
@@ -232,29 +183,18 @@ CREATE TABLE IF NOT EXISTS staging.estabelecimentos (
 CREATE TABLE IF NOT EXISTS staging.socios (
 
     cnpj_basico TEXT,
-
     tipo_socio_codigo TEXT,
-
     nome_socio TEXT,
-
     documento_socio TEXT,
-
     qualificacao_codigo TEXT,
-
     data_entrada TEXT,
-
     pais_codigo TEXT,
-
     representante_legal_documento TEXT,
-
     representante_legal_nome TEXT,
-
     qualificacao_representante_codigo TEXT,
-
     faixa_etaria TEXT
 
 );
-
 
 -- =====================================================================
 -- SIMPLES NACIONAL / MEI
@@ -274,21 +214,14 @@ CREATE TABLE IF NOT EXISTS staging.socios (
 CREATE TABLE IF NOT EXISTS staging.simples (
 
     cnpj_basico TEXT,
-
     opcao_simples TEXT,
-
     data_opcao_simples TEXT,
-
     data_exclusao_simples TEXT,
-
     opcao_mei TEXT,
-
     data_opcao_mei TEXT,
-
     data_exclusao_mei TEXT
 
 );
-
 
 -- =====================================================================
 -- CNPJ CE
@@ -303,7 +236,37 @@ CREATE TABLE IF NOT EXISTS staging.simples (
 -- =====================================================================
 
 CREATE TABLE IF NOT EXISTS staging.cnpj_ce (
-
     cnpj_basico TEXT
+);
 
+-- =====================================================================
+-- JUNTA COMERCIAL - EMPRESAS
+--
+-- Área de staging para os dados brutos provenientes do arquivo CSV
+-- fornecido pela Junta Comercial.
+--
+-- Todos os campos são armazenados inicialmente como TEXT.
+-- Conversões, normalizações e validações são realizadas durante
+-- a promoção dos dados para as tabelas do schema public.
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS staging.junta_empresas (
+    cnpj TEXT,
+    cnaes TEXT,
+    razao_social TEXT,
+    nome_fantasia TEXT,
+    status TEXT,
+    porte TEXT,
+    municipio TEXT,
+    regiao TEXT,
+    nu_dddtelefone TEXT,
+    nu_telefone TEXT,
+    email TEXT,
+    tipo_logradouro TEXT,
+    nome_logradouro TEXT,
+    num_logradouro TEXT,
+    bairro TEXT,
+    cd_opcao_simples_nacional TEXT,
+    data_abertura TEXT,
+    data_encerramento TEXT
 );

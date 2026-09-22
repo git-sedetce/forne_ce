@@ -283,3 +283,89 @@ ON analytics.cociente_locacional (
     competencia,
     cociente_locacional DESC
 );
+
+-- =====================================================================
+-- JUNTA COMERCIAL - EMPRESAS
+-- =====================================================================
+
+-- Consulta direta por CNPJ.
+--
+-- Embora exista UNIQUE (cnpj, competencia), esse índice composto começa
+-- por cnpj e já pode atender consultas que filtram somente pelo CNPJ.
+-- Portanto, não criamos outro índice exclusivo para cnpj.
+
+
+-- Consulta por competência
+CREATE INDEX IF NOT EXISTS idx_junta_empresas_competencia
+ON public.junta_empresas (
+    competencia
+);
+
+
+-- Consulta por situação da empresa dentro de uma competência
+CREATE INDEX IF NOT EXISTS idx_junta_empresas_competencia_status
+ON public.junta_empresas (
+    competencia,
+    status
+);
+
+
+-- Consulta por município dentro de uma competência
+CREATE INDEX IF NOT EXISTS idx_junta_empresas_competencia_municipio
+ON public.junta_empresas (
+    competencia,
+    municipio
+);
+
+
+-- Consulta por região dentro de uma competência
+CREATE INDEX IF NOT EXISTS idx_junta_empresas_competencia_regiao
+ON public.junta_empresas (
+    competencia,
+    regiao
+);
+
+
+-- Rastreamento da carga responsável pelo registro
+CREATE INDEX IF NOT EXISTS idx_junta_empresas_carga
+ON public.junta_empresas (
+    carga_id
+);
+
+
+-- =====================================================================
+-- JUNTA COMERCIAL - PESQUISA TEXTUAL
+-- =====================================================================
+
+-- Pesquisa por razão social utilizando ILIKE
+CREATE INDEX IF NOT EXISTS idx_junta_empresas_razao_social_trgm
+ON public.junta_empresas
+USING gin (
+    razao_social gin_trgm_ops
+);
+
+
+-- Pesquisa por nome fantasia utilizando ILIKE
+CREATE INDEX IF NOT EXISTS idx_junta_empresas_nome_fantasia_trgm
+ON public.junta_empresas
+USING gin (
+    nome_fantasia gin_trgm_ops
+);
+
+
+-- =====================================================================
+-- JUNTA COMERCIAL - CNAES
+-- =====================================================================
+
+-- Consulta das empresas relacionadas a determinado CNAE
+CREATE INDEX IF NOT EXISTS idx_junta_empresa_cnaes_cnae
+ON public.junta_empresa_cnaes (
+    cnae_codigo
+);
+
+
+-- Rastreamento da carga
+CREATE INDEX IF NOT EXISTS idx_junta_empresa_cnaes_carga
+ON public.junta_empresa_cnaes (
+    carga_id
+);
