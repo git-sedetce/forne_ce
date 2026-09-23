@@ -1260,17 +1260,11 @@ export class ConsultaEmpresasComponent implements OnInit {
         // =================================================
 
         const cnpjLinhas = doc.splitTextToSize(cnpj, larguraColuna);
-
         const fantasiaLinhas = doc.splitTextToSize(nomeFantasia, larguraColuna);
-
         const porteLinhas = doc.splitTextToSize(porte, larguraColuna);
-
         const municipioLinhas = doc.splitTextToSize(municipio, larguraColuna);
-
         const telefoneLinhas = doc.splitTextToSize(telefone, larguraColuna);
-
         const emailLinhas = doc.splitTextToSize(email, larguraColuna);
-
         const enderecoLinhas = doc.splitTextToSize(
           enderecoTexto,
           larguraConteudo,

@@ -364,20 +364,14 @@ def analisar_staging(conn):
             SELECT
 
                 COUNT(*) FILTER (
-                    WHERE NULLIF(TRIM(cnpj), '') IS NULL
-                ) AS sem_cnpj,
-
-                COUNT(*) FILTER (
-                    WHERE NULLIF(TRIM(cnpj), '') IS NOT NULL
-                      AND length(
-                            regexp_replace(
-                                cnpj,
-                                '[^0-9]',
-                                '',
-                                'g'
-                            )
-                          ) <> 14
-                ) AS cnpj_invalido
+                WHERE NULLIF(TRIM(cnpj), '') IS NOT NULL
+                    AND (
+                    length(
+                        regexp_replace(cnpj,'[^0-9]','','g')
+                        ) <> 14
+                    OR regexp_replace(cnpj,'[^0-9]','','g') = '00000000000000'
+                        )
+                    ) AS cnpj_invalido
 
             FROM staging.junta_empresas
             """
@@ -445,6 +439,13 @@ def analisar_staging(conn):
                             'g'
                         )
                     ) = 14
+
+                    AND regexp_replace(
+                        cnpj,
+                        '[^0-9]',
+                        '',
+                        'g'
+                    ) <> '00000000000000'
 
                 GROUP BY
                     regexp_replace(
@@ -667,7 +668,7 @@ def preparar_dados_validos(conn):
 
             ) origem
 
-            WHERE length(cnpj_normalizado) = 14
+            WHERE length(cnpj_normalizado) = 14 AND cnpj_normalizado <> '00000000000000'WHERE length(cnpj_normalizado) = 14
 
             ORDER BY
                 cnpj_normalizado
