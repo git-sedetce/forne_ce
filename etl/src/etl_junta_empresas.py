@@ -1,8 +1,7 @@
+import argparse
 import csv
-import re
 import time
-from datetime import datetime
-from pathlib import Path
+from datetime import datetime, timedelta
 
 from config import RAW_DIR, COMPETENCIA_JUNTA
 from database import get_connection
@@ -48,159 +47,6 @@ CABECALHO_ESPERADO = [
     "DATA_ABERTURA",
     "DATA_ENCERRAMENTO",
 ]
-
-
-# ============================================================
-# NORMALIZAÇÕES
-# ============================================================
-
-def normalizar_texto(valor):
-    if valor is None:
-        return None
-
-    valor = valor.strip()
-
-    return valor or None
-
-
-def somente_digitos(valor):
-    if not valor:
-        return None
-
-    valor = re.sub(
-        r"\D",
-        "",
-        valor,
-    )
-
-    return valor or None
-
-
-def normalizar_cnpj(valor):
-    valor = somente_digitos(valor)
-
-    if not valor:
-        return None
-
-    if len(valor) != 14:
-        return None
-
-    return valor
-
-
-def normalizar_ddd(valor):
-    valor = somente_digitos(valor)
-
-    if not valor:
-        return None
-
-    if len(valor) != 2:
-        return None
-
-    if valor == "00":
-        return None
-
-    return valor
-
-
-def normalizar_telefone(valor):
-    valor = somente_digitos(valor)
-
-    if not valor:
-        return None
-
-    if valor in (
-        "00000000",
-        "000000000",
-    ):
-        return None
-
-    return valor
-
-
-def normalizar_simples(valor):
-    valor = normalizar_texto(valor)
-
-    if not valor:
-        return None
-
-    valor = valor.upper()
-
-    if valor in (
-        "S",
-        "N",
-    ):
-        return valor
-
-    return None
-
-
-def converter_data(valor):
-    """
-    Formato observado no arquivo da Junta:
-
-        20-06-2018 00:00:00.000
-
-    Também aceita DD-MM-YYYY caso o horário não esteja presente.
-    """
-
-    valor = normalizar_texto(valor)
-
-    if not valor:
-        return None
-
-    formatos = (
-        "%d-%m-%Y %H:%M:%S.%f",
-        "%d-%m-%Y %H:%M:%S",
-        "%d-%m-%Y",
-    )
-
-    for formato in formatos:
-        try:
-            return datetime.strptime(
-                valor,
-                formato,
-            ).date()
-
-        except ValueError:
-            continue
-
-    return None
-
-
-def separar_cnaes(valor):
-    """
-    Retorna os CNAEs na ordem em que aparecem no CSV.
-
-    IMPORTANTE:
-    ordem=1 NÃO significa CNAE principal.
-    """
-
-    valor = normalizar_texto(valor)
-
-    if not valor:
-        return []
-
-    resultado = []
-    vistos = set()
-
-    for item in valor.split(","):
-        codigo = somente_digitos(item)
-
-        if not codigo:
-            continue
-
-        if len(codigo) != 7:
-            continue
-
-        if codigo in vistos:
-            continue
-
-        vistos.add(codigo)
-        resultado.append(codigo)
-
-    return resultado
-
 
 # ============================================================
 # LOCALIZAR ARQUIVO
@@ -477,28 +323,6 @@ def carregar_staging(
         registros_erro=totais["erros"],
     )
 
-
-# ============================================================
-# CNAES VÁLIDOS
-# ============================================================
-
-def carregar_cnaes_validos(conn):
-    with conn.cursor() as cur:
-
-        cur.execute(
-            """
-            SELECT codigo
-            FROM public.cnaes
-            """
-        )
-
-        return {
-            str(row[0]).strip()
-            for row in cur.fetchall()
-            if row[0] is not None
-        }
-
-
 # ============================================================
 # ANALISAR STAGING
 # ============================================================
@@ -507,7 +331,13 @@ def analisar_staging(conn):
     """
     Analisa os dados brutos antes da promoção para public.
 
-    Retorna estatísticas de validação sem alterar os dados.
+    Distingue:
+    - registros sem CNPJ;
+    - registros com CNPJ estruturalmente inválido;
+    - datas com formato inválido;
+    - CNPJs duplicados no CSV.
+
+    Não altera os dados.
     """
 
     with conn.cursor() as cur:
@@ -526,47 +356,37 @@ def analisar_staging(conn):
         total = cur.fetchone()[0]
 
         # ----------------------------------------------------
-        # CNPJ INVÁLIDO
-        #
-        # Aqui validamos apenas estrutura:
-        # exatamente 14 dígitos.
-        #
-        # A validação matemática dos dígitos verificadores
-        # poderá ser acrescentada posteriormente.
+        # CNPJ
         # ----------------------------------------------------
 
         cur.execute(
             """
-            SELECT COUNT(*)
-            FROM staging.junta_empresas
-            WHERE
-                NULLIF(
-                    regexp_replace(
-                        COALESCE(cnpj, ''),
-                        '[^0-9]',
-                        '',
-                        'g'
-                    ),
-                    ''
-                ) IS NULL
+            SELECT
 
-                OR length(
-                    regexp_replace(
-                        COALESCE(cnpj, ''),
-                        '[^0-9]',
-                        '',
-                        'g'
-                    )
-                ) <> 14
+                COUNT(*) FILTER (
+                    WHERE NULLIF(TRIM(cnpj), '') IS NULL
+                ) AS sem_cnpj,
+
+                COUNT(*) FILTER (
+                    WHERE NULLIF(TRIM(cnpj), '') IS NOT NULL
+                      AND length(
+                            regexp_replace(
+                                cnpj,
+                                '[^0-9]',
+                                '',
+                                'g'
+                            )
+                          ) <> 14
+                ) AS cnpj_invalido
+
+            FROM staging.junta_empresas
             """
         )
 
-        cnpj_invalido = cur.fetchone()[0]
+        sem_cnpj, cnpj_invalido = cur.fetchone()
 
         # ----------------------------------------------------
-        # DATAS INVÁLIDAS
-        #
-        # Primeiro verificamos apenas o formato textual.
+        # DATAS
         # ----------------------------------------------------
 
         cur.execute(
@@ -591,7 +411,7 @@ def analisar_staging(conn):
         datas_formato_invalido = cur.fetchone()[0]
 
         # ----------------------------------------------------
-        # DUPLICIDADE DE CNPJ NO PRÓPRIO CSV
+        # DUPLICIDADE DE CNPJ NO CSV
         # ----------------------------------------------------
 
         cur.execute(
@@ -609,18 +429,22 @@ def analisar_staging(conn):
                         '',
                         'g'
                     ) AS cnpj_normalizado,
+
                     COUNT(*) AS quantidade
 
                 FROM staging.junta_empresas
 
-                WHERE length(
-                    regexp_replace(
-                        COALESCE(cnpj, ''),
-                        '[^0-9]',
-                        '',
-                        'g'
-                    )
-                ) = 14
+                WHERE
+                    NULLIF(TRIM(cnpj), '') IS NOT NULL
+
+                    AND length(
+                        regexp_replace(
+                            cnpj,
+                            '[^0-9]',
+                            '',
+                            'g'
+                        )
+                    ) = 14
 
                 GROUP BY
                     regexp_replace(
@@ -631,6 +455,7 @@ def analisar_staging(conn):
                     )
 
                 HAVING COUNT(*) > 1
+
             ) duplicados
             """
         )
@@ -641,6 +466,7 @@ def analisar_staging(conn):
 
     return {
         "total": total,
+        "sem_cnpj": sem_cnpj,
         "cnpj_invalido": cnpj_invalido,
         "datas_formato_invalido": (
             datas_formato_invalido
@@ -848,8 +674,89 @@ def preparar_dados_validos(conn):
             """
         )
 
+        # ----------------------------------------------------
+        # QUANTIDADE DE REGISTROS VÁLIDOS
+        # ----------------------------------------------------
+
+        cur.execute(
+            """
+            SELECT COUNT(*)
+            FROM tmp_junta_empresas_validas
+            """
+        )
+
+        total_validos = cur.fetchone()[0]
+
     conn.commit()
 
+    return total_validos
+
+
+# ============================================================
+# ANALISAR DATAS
+# ============================================================
+
+def analisar_qualidade_datas(conn):
+    """
+    Analisa anomalias de qualidade nas datas dos registros válidos
+    da Junta Comercial.
+
+    As anomalias não impedem a carga.
+    """
+
+    # Último dia da competência.
+    ano, mes = map(int, COMPETENCIA_JUNTA.split("-"))
+
+    if mes == 12:
+        proximo_ano = ano + 1
+        proximo_mes = 1
+    else:
+        proximo_ano = ano
+        proximo_mes = mes + 1
+
+    limite_competencia = (
+        datetime(proximo_ano, proximo_mes, 1).date()
+        - timedelta(days=1)
+    )
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+                COUNT(*) FILTER (
+                    WHERE data_abertura < DATE '1800-01-01'
+                ) AS abertura_antes_1800,
+
+                COUNT(*) FILTER (
+                    WHERE data_abertura > %s
+                ) AS abertura_futura,
+
+                COUNT(*) FILTER (
+                    WHERE data_encerramento > %s
+                ) AS encerramento_futuro,
+
+                COUNT(*) FILTER (
+                    WHERE data_abertura IS NOT NULL
+                      AND data_encerramento IS NOT NULL
+                      AND data_encerramento < data_abertura
+                ) AS encerramento_antes_abertura
+
+            FROM tmp_junta_empresas_validas
+            """,
+            (
+                limite_competencia,
+                limite_competencia,
+            ),
+        )
+
+        resultado = cur.fetchone()
+
+    return {
+        "abertura_antes_1800": resultado[0],
+        "abertura_futura": resultado[1],
+        "encerramento_futuro": resultado[2],
+        "encerramento_antes_abertura": resultado[3],
+    }
 
 # ============================================================
 # ESTATÍSTICAS DO STAGING
@@ -996,8 +903,6 @@ def promover_empresas(
 
         inseridos = cur.rowcount
 
-    conn.commit()
-
     return inseridos
 
 
@@ -1041,8 +946,8 @@ def promover_cnaes(
                     ) AS item(codigo)
 
                 WHERE
-                    TRIM(item.codigo)
-                        ~ '^[0-9]{7}$'
+                    TRIM(item.codigo) ~ '^[0-9]{7}$'
+                    AND TRIM(item.codigo) <> '0000000'
             )
 
             SELECT COUNT(*)
@@ -1094,8 +999,8 @@ def promover_cnaes(
                     )
 
                 WHERE
-                    TRIM(item.codigo)
-                        ~ '^[0-9]{7}$'
+                    TRIM(item.codigo) ~ '^[0-9]{7}$'
+                    AND TRIM(item.codigo) <> '0000000'
             ),
 
             cnaes_sem_duplicidade AS (
@@ -1158,8 +1063,6 @@ def promover_cnaes(
 
         inseridos = cur.rowcount
 
-    conn.commit()
-
     return (
         inseridos,
         desconhecidos,
@@ -1174,6 +1077,7 @@ def processar_staging(
     conn,
     carga_id,
     totais,
+    reprocessar=False,
 ):
     print()
     print("=" * 70)
@@ -1181,95 +1085,133 @@ def processar_staging(
     print("=" * 70)
 
     # --------------------------------------------------------
-    # ANÁLISE
+    # ANÁLISE DO STAGING
     # --------------------------------------------------------
 
-    estatisticas = analisar_staging(
-        conn
-    )
+    estatisticas = analisar_staging(conn)
 
     print(
-        f"Registros staging:      "
+        f"Registros staging:       "
         f"{estatisticas['total']:,}"
     )
 
     print(
-        f"CNPJs inválidos:         "
+        f"Sem CNPJ:                "
+        f"{estatisticas['sem_cnpj']:,}"
+    )
+
+    print(
+        f"CNPJ inválido:            "
         f"{estatisticas['cnpj_invalido']:,}"
     )
 
     print(
-        f"Datas formato inválido:  "
+        f"Datas formato inválido:   "
         f"{estatisticas['datas_formato_invalido']:,}"
     )
 
     print(
-        f"Duplicados no CSV:       "
+        f"Duplicados no CSV:        "
         f"{estatisticas['duplicados_csv']:,}"
     )
 
     # --------------------------------------------------------
-    # PREPARAÇÃO
+    # PREPARAÇÃO DOS REGISTROS VÁLIDOS
     # --------------------------------------------------------
 
     print()
-    print(
-        "Preparando registros válidos..."
-    )
+    print("Preparando registros válidos...")
 
-    preparar_dados_validos(
-        conn
-    )
-
-    # --------------------------------------------------------
-    # QUANTIDADE VÁLIDA
-    # --------------------------------------------------------
-
-    with conn.cursor() as cur:
-
-        cur.execute(
-            """
-            SELECT COUNT(*)
-            FROM tmp_junta_empresas_validas
-            """
-        )
-
-        validos = cur.fetchone()[0]
+    validos = preparar_dados_validos(conn)
 
     print(
-        f"Empresas válidas:        "
+        f"Empresas válidas:         "
         f"{validos:,}"
     )
 
     # --------------------------------------------------------
-    # EMPRESAS
+    # QUALIDADE DAS DATAS
     # --------------------------------------------------------
+
+    qualidade_datas = analisar_qualidade_datas(conn)
 
     print()
-    print(
-        "Inserindo empresas..."
-    )
-
-    inseridos = promover_empresas(
-        conn,
-        carga_id,
-    )
-
-    # --------------------------------------------------------
-    # CNAES
-    # --------------------------------------------------------
+    print("Anomalias de qualidade das datas:")
 
     print(
-        "Relacionando CNAEs..."
+        f" - Abertura antes de 1800:       "
+        f"{qualidade_datas['abertura_antes_1800']:,}"
     )
 
-    (
-        cnaes_inseridos,
-        cnaes_desconhecidos,
-    ) = promover_cnaes(
-        conn,
-        carga_id,
+    print(
+        f" - Abertura futura:               "
+        f"{qualidade_datas['abertura_futura']:,}"
     )
+
+    print(
+        f" - Encerramento futuro:           "
+        f"{qualidade_datas['encerramento_futuro']:,}"
+    )
+
+    print(
+        f" - Encerramento antes abertura:   "
+        f"{qualidade_datas['encerramento_antes_abertura']:,}"
+    )
+
+        # --------------------------------------------------------
+    # PROMOÇÃO PARA PUBLIC
+    # --------------------------------------------------------
+
+    try:
+
+        if reprocessar:
+
+            print()
+            print("Substituindo competência existente...")
+
+            removidos = limpar_competencia(
+                conn
+            )
+
+            print(
+                f"Empresas removidas:       "
+                f"{removidos['empresas']:,}"
+            )
+
+            print(
+                f"Vínculos CNAE removidos:  "
+                f"{removidos['cnaes']:,}"
+            )
+
+        print()
+        print("Inserindo empresas...")
+
+        inseridos = promover_empresas(
+            conn,
+            carga_id,
+        )
+
+        print("Relacionando CNAEs...")
+
+        (
+            cnaes_inseridos,
+            cnaes_desconhecidos,
+        ) = promover_cnaes(
+            conn,
+            carga_id,
+        )
+
+        # DELETE + empresas + CNAEs tornam-se permanentes
+        # somente aqui.
+        conn.commit()
+
+    except Exception:
+
+        # Se qualquer operação da promoção falhar,
+        # desfaz DELETE + INSERT empresas + INSERT CNAEs.
+        conn.rollback()
+
+        raise
 
     # --------------------------------------------------------
     # CONTADORES
@@ -1286,79 +1228,184 @@ def processar_staging(
     )
 
     totais["erros"] += (
-        estatisticas["cnpj_invalido"]
+        estatisticas["sem_cnpj"]
+        + estatisticas["cnpj_invalido"]
         + estatisticas["datas_formato_invalido"]
     )
 
-    totais[
-        "cnaes_inseridos"
-    ] = cnaes_inseridos
+    totais["cnaes_inseridos"] = (
+        cnaes_inseridos
+    )
 
-    totais[
-        "cnaes_desconhecidos"
-    ] = cnaes_desconhecidos
+    totais["cnaes_desconhecidos"] = (
+        cnaes_desconhecidos
+    )
+
+    # --------------------------------------------------------
+    # ATUALIZAR CARGA
+    # --------------------------------------------------------
 
     atualizar_carga(
         conn,
         carga_id,
-
-        registros_lidos=(
-            totais["lidos"]
-        ),
-
-        registros_processados=(
-            totais["processados"]
-        ),
-
-        registros_inseridos=(
-            totais["inseridos"]
-        ),
-
+        registros_lidos=totais["lidos"],
+        registros_processados=totais["processados"],
+        registros_inseridos=totais["inseridos"],
         registros_atualizados=0,
-
-        registros_duplicados=(
-            totais["duplicados"]
-        ),
-
-        registros_erro=(
-            totais["erros"]
-        ),
+        registros_duplicados=totais["duplicados"],
+        registros_erro=totais["erros"],
     )
+
+    # --------------------------------------------------------
+    # RESUMO
+    # --------------------------------------------------------
 
     print()
     print("-" * 70)
 
     print(
-        f"Empresas processadas:   "
+        f"Empresas processadas:    "
         f"{totais['processados']:,}"
     )
 
     print(
-        f"Empresas inseridas:     "
+        f"Empresas inseridas:      "
         f"{totais['inseridos']:,}"
     )
 
     print(
-        f"Duplicados:              "
+        f"Duplicados:               "
         f"{totais['duplicados']:,}"
     )
 
     print(
-        f"Erros:                   "
+        f"Erros:                    "
         f"{totais['erros']:,}"
     )
 
     print(
-        f"CNAEs vinculados:        "
+        f"CNAEs vinculados:         "
         f"{totais['cnaes_inseridos']:,}"
     )
 
     print(
-        f"CNAEs desconhecidos:     "
+        f"CNAEs desconhecidos:      "
         f"{totais['cnaes_desconhecidos']:,}"
     )
 
     print("-" * 70)
+
+
+# ============================================================
+# REPROCESSAR
+# ============================================================
+
+def obter_argumentos():
+    parser = argparse.ArgumentParser(
+        description=(
+            "Carga de empresas da Junta Comercial "
+            "do Estado do Ceará."
+        )
+    )
+
+    parser.add_argument(
+        "--reprocessar",
+        action="store_true",
+        help=(
+            "Remove e recria os dados da competência "
+            "da Junta caso ela já tenha sido carregada."
+        ),
+    )
+
+    return parser.parse_args()
+
+def verificar_competencia_existente(conn):
+    """
+    Verifica quantas empresas da competência atual
+    já existem em public.junta_empresas.
+    """
+
+    with conn.cursor() as cur:
+
+        cur.execute(
+            """
+            SELECT COUNT(*)
+            FROM public.junta_empresas
+            WHERE competencia = %s
+            """,
+            (
+                COMPETENCIA_JUNTA,
+            ),
+        )
+
+        return cur.fetchone()[0]
+
+def limpar_competencia(conn):
+    """
+    Remove os dados da competência da Junta.
+
+    Os registros de public.junta_empresa_cnaes são
+    removidos automaticamente pelo ON DELETE CASCADE.
+
+    Não remove registros de public.cargas, preservando
+    o histórico das execuções.
+    """
+
+    with conn.cursor() as cur:
+
+        # ----------------------------------------------------
+        # CONTAGEM ANTES DA EXCLUSÃO
+        # ----------------------------------------------------
+
+        cur.execute(
+            """
+            SELECT COUNT(*)
+            FROM public.junta_empresas
+            WHERE competencia = %s
+            """,
+            (
+                COMPETENCIA_JUNTA,
+            ),
+        )
+
+        empresas = cur.fetchone()[0]
+
+        cur.execute(
+            """
+            SELECT COUNT(*)
+            FROM public.junta_empresa_cnaes jec
+
+            INNER JOIN public.junta_empresas je
+                ON je.id = jec.junta_empresa_id
+
+            WHERE je.competencia = %s
+            """,
+            (
+                COMPETENCIA_JUNTA,
+            ),
+        )
+
+        cnaes = cur.fetchone()[0]
+
+        # ----------------------------------------------------
+        # EXCLUSÃO
+        # ----------------------------------------------------
+
+        cur.execute(
+            """
+            DELETE FROM public.junta_empresas
+            WHERE competencia = %s
+            """,
+            (
+                COMPETENCIA_JUNTA,
+            ),
+        )
+
+    return {
+        "empresas": empresas,
+        "cnaes": cnaes,
+    }
+
 
 
 # ============================================================
@@ -1367,10 +1414,9 @@ def processar_staging(
 
 def main():
 
+    args = obter_argumentos()
     conn = get_connection()
-
     carga_id = None
-
     totais = {
         "lidos": 0,
         "processados": 0,
@@ -1394,7 +1440,6 @@ def main():
         # ----------------------------------------------------
 
         arquivo = localizar_arquivo()
-
         encoding = detectar_encoding(
             arquivo
         )
@@ -1403,6 +1448,65 @@ def main():
             arquivo,
             encoding,
         )
+
+        # ----------------------------------------------------
+        # VERIFICAR COMPETÊNCIA
+        # ----------------------------------------------------
+
+        registros_existentes = (
+            verificar_competencia_existente(
+                conn
+            )
+        )
+
+        if registros_existentes > 0:
+            if not args.reprocessar:
+
+                print()
+                print("*" * 70)
+                print("CARGA NÃO EXECUTADA")
+                print("*" * 70)
+
+                print(
+                    f"A competência {COMPETENCIA_JUNTA}"
+                    "da Junta Comercial já foi carregado."
+                    )
+                print(
+                    f"Empresas existentes: "
+                    f"{registros_existentes:,}"
+                )
+                print()
+                print("Para substituir essa competência:")
+                print()
+                print(
+                    "    python etl_junta_empresas.py "
+                    "--reprocessar"
+                )
+
+                print("=" * 70)
+
+                return
+            print()
+            print("=" * 70)
+            print("REPROCESSAMENTO DA JUNTA COMERCIAL")
+            print("=" * 70)
+
+            print(
+                f"Competência: "
+                f"{COMPETENCIA_JUNTA}"
+            )
+
+            print(
+                f"Empresas existentes: "
+                f"{registros_existentes:,}"
+            )
+
+            print()
+            print(
+                "A competência existente será substituída "
+                "somente após a validação do novo arquivo."
+            )
+            print("=" * 70)
 
         # ----------------------------------------------------
         # CARGA
@@ -1427,6 +1531,11 @@ def main():
         print(
             f"Carga ID:    "
             f"{carga_id}"
+        )
+
+        print(
+            f"Modo:        "
+            f"{'REPROCESSAMENTO' if args.reprocessar else 'CARGA NORMAL'}"
         )
 
         print(
@@ -1472,6 +1581,7 @@ def main():
             conn=conn,
             carga_id=carga_id,
             totais=totais,
+            reprocessar=args.reprocessar,
         )
 
         # ----------------------------------------------------
