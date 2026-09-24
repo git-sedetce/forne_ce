@@ -1,5 +1,4 @@
 import { Component, OnInit } from '@angular/core';
-import { EmpresaCnae } from '../../../interfaces/empresa-cnae.interface';
 import { EmpresaService } from '../../../services/empresa.service';
 import { Subject } from 'rxjs';
 import {
@@ -12,7 +11,10 @@ import {
 import { jsPDF } from 'jspdf';
 import { MUNICIPIOS_POR_REGIAO } from '../../../data/regioes-ce';
 import { CnaeItem } from '../../../interfaces/cnae.interface';
-import { EmpresasPesquisaResponse } from '../../../interfaces/empresa-pesquisa.interface';
+import {
+  EmpresaJucec,
+  EmpresasJucecResponse,
+} from '../../../interfaces/empresa-jucec.interface';
 
 @Component({
   selector: 'app-consulta-empresas',
@@ -29,7 +31,8 @@ export class ConsultaEmpresasComponent implements OnInit {
   municipio = '';
   uf = 'CE';
 
-  empresas: EmpresaCnae[] = [];
+  // empresas: EmpresaCnae[] = [];
+  empresas: EmpresaJucec[] = [];
 
   carregando = false;
   pesquisou = false;
@@ -53,11 +56,17 @@ export class ConsultaEmpresasComponent implements OnInit {
   porte = '';
   municipiosFiltrados: string[] = [];
 
+  // readonly portes: Record<string, string> = {
+  //   '00': 'Não informado',
+  //   '01': 'Micro Empresa',
+  //   '03': 'Empresa de Pequeno Porte',
+  //   '05': 'Demais Empresas',
+  // };
+
   readonly portes: Record<string, string> = {
-    '00': 'Não informado',
-    '01': 'Micro Empresa',
-    '03': 'Empresa de Pequeno Porte',
-    '05': 'Demais Empresas',
+    ME: 'Microempresa',
+    EPP: 'Empresa de Pequeno Porte',
+    NORMAL: 'Normal',
   };
 
   get porteDescricao(): string {
@@ -126,7 +135,7 @@ export class ConsultaEmpresasComponent implements OnInit {
   // EMPRESAS SELECIONADAS
   // =====================================================
 
-  empresasSelecionadas = new Map<string, EmpresaCnae>();
+  empresasSelecionadas = new Map<number, EmpresaJucec>();
 
   readonly limiteSelecao = 10;
 
@@ -239,19 +248,12 @@ export class ConsultaEmpresasComponent implements OnInit {
     this.carregando = true;
     this.mensagemErro = '';
 
-    const municipiosDaRegiao =
-      this.regiao && !this.municipio
-        ? this.municipiosPorRegiao[this.regiao] || []
-        : [];
-
     this.empresaService
-      .pesquisarEmpresas(this.pagina, this.limite, {
+      .pesquisarEmpresasJucec(this.pagina, this.limite, {
         cnae: this.cnae || undefined,
-        uf: this.uf,
         regiao: this.regiao || undefined,
         municipio: this.municipio || undefined,
         porte: this.porte || undefined,
-        municipios: municipiosDaRegiao,
       })
       .pipe(
         finalize(() => {
@@ -259,14 +261,19 @@ export class ConsultaEmpresasComponent implements OnInit {
         }),
       )
       .subscribe({
-        next: (response: EmpresasPesquisaResponse) => {
+        next: (response: EmpresasJucecResponse) => {
           this.pesquisou = true;
 
           this.empresas = response.dados;
+
           this.pagina = response.paginacao.pagina;
+
           this.limite = response.paginacao.limite;
+
           this.totalItens = response.paginacao.total_itens;
+
           this.totalPaginas = response.paginacao.total_paginas;
+
           this.competencia = response.filtros.competencia;
 
           // ===============================================
@@ -279,14 +286,18 @@ export class ConsultaEmpresasComponent implements OnInit {
             this.cnaeFormatado = response.filtros.cnae_formatado || this.cnae;
 
             /*
-             * Quando o CNAE foi escolhido pelo autocomplete,
-             * a descrição já estará preenchida.
+             * A descrição normalmente já veio do
+             * autocomplete da Receita.
              *
-             * Caso tenha sido digitado manualmente, podemos
-             * aproveitar o primeiro resultado.
+             * Se o usuário digitou o código manualmente,
+             * procuramos esse CNAE na primeira ocorrência.
              */
             if (!this.cnaeDescricao && response.dados.length > 0) {
-              this.cnaeDescricao = response.dados[0].cnae_principal_descricao;
+              const cnaeEncontrado = response.dados[0].cnaes?.find(
+                (item) => item.codigo === this.cnae,
+              );
+
+              this.cnaeDescricao = cnaeEncontrado?.descricao || '';
             }
           } else {
             this.cnaeFormatado = '';
@@ -295,7 +306,7 @@ export class ConsultaEmpresasComponent implements OnInit {
         },
 
         error: (error) => {
-          console.error('Erro ao consultar empresas:', error);
+          console.error('Erro ao consultar empresas na JUCEC:', error);
 
           this.empresas = [];
           this.pesquisou = true;
@@ -309,9 +320,9 @@ export class ConsultaEmpresasComponent implements OnInit {
       });
   }
 
-  empresaPodeSerSelecionada(cnpj: string): boolean {
+  empresaPodeSerSelecionada(ocorrenciaId: number): boolean {
     return (
-      this.empresaSelecionada(cnpj) ||
+      this.empresaSelecionada(ocorrenciaId) ||
       this.quantidadeSelecionadas < this.limiteSelecao
     );
   }
@@ -330,8 +341,8 @@ export class ConsultaEmpresasComponent implements OnInit {
     this.buscarEmpresas();
   }
 
-  trackByEmpresa(index: number, empresa: EmpresaCnae): string {
-    return empresa.cnpj;
+  trackByEmpresa(index: number, empresa: EmpresaJucec): number {
+    return empresa.ocorrencia_id;
   }
 
   mudarLimite(): void {
@@ -394,37 +405,34 @@ export class ConsultaEmpresasComponent implements OnInit {
   // SELEÇÃO
   // =====================================================
 
-  selecionarEmpresa(empresa: EmpresaCnae, event: Event): void {
+  selecionarEmpresa(empresa: EmpresaJucec, event: Event): void {
     const input = event.target as HTMLInputElement;
 
     if (input.checked) {
       if (this.empresasSelecionadas.size >= this.limiteSelecao) {
         input.checked = false;
 
-        this.mensagemErro = `Você pode selecionar no máximo ${this.limiteSelecao} empresas.`;
+        this.mensagemErro =
+          `Você pode selecionar no máximo ` + `${this.limiteSelecao} empresas.`;
 
         return;
       }
 
-      this.empresasSelecionadas.set(empresa.cnpj, empresa);
+      this.empresasSelecionadas.set(empresa.ocorrencia_id, empresa);
 
       this.mensagemErro = '';
     } else {
-      this.empresasSelecionadas.delete(empresa.cnpj);
+      this.empresasSelecionadas.delete(empresa.ocorrencia_id);
     }
   }
 
-  empresaSelecionada(cnpj: string): boolean {
-    return this.empresasSelecionadas.has(cnpj);
+  empresaSelecionada(ocorrenciaId: number): boolean {
+    return this.empresasSelecionadas.has(ocorrenciaId);
   }
 
-  removerSelecionada(cnpj: string): void {
-    this.empresasSelecionadas.delete(cnpj);
+  removerSelecionada(ocorrenciaId: number): void {
+    this.empresasSelecionadas.delete(ocorrenciaId);
 
-    /*
-     * Se o modal estiver aberto e o usuário
-     * remover todas as empresas, fecha o modal.
-     */
     if (this.modalContatoAberto && this.quantidadeSelecionadas === 0) {
       this.fecharModalContato();
     }
@@ -436,7 +444,7 @@ export class ConsultaEmpresasComponent implements OnInit {
     this.fecharModalContato();
   }
 
-  get selecionadas(): EmpresaCnae[] {
+  get selecionadas(): EmpresaJucec[] {
     return Array.from(this.empresasSelecionadas.values());
   }
 
@@ -779,38 +787,31 @@ export class ConsultaEmpresasComponent implements OnInit {
     return `${partes[2]}/${partes[1]}/${partes[0]}`;
   }
 
-  enderecoCompleto(empresa: EmpresaCnae): string {
-    const endereco: string[] = [];
+  enderecoCompleto(empresa: EmpresaJucec): string {
+    const partes: string[] = [];
 
     const logradouro = [empresa.tipo_logradouro, empresa.logradouro]
       .filter(Boolean)
-      .join(' ');
+      .join(' ')
+      .trim();
 
     if (logradouro) {
-      endereco.push(logradouro);
+      partes.push(logradouro);
     }
 
     if (empresa.numero) {
-      endereco.push(empresa.numero);
-    }
-
-    if (empresa.complemento) {
-      endereco.push(empresa.complemento);
+      partes.push(empresa.numero);
     }
 
     if (empresa.bairro) {
-      endereco.push(empresa.bairro);
+      partes.push(empresa.bairro);
     }
 
     if (empresa.municipio) {
-      endereco.push(`${empresa.municipio}/${empresa.uf}`);
+      partes.push(`${empresa.municipio}/CE`);
     }
 
-    if (empresa.cep) {
-      endereco.push(`CEP ${this.formatarCep(empresa.cep)}`);
-    }
-
-    return endereco.join(', ') || 'Endereço não informado';
+    return partes.length ? partes.join(', ') : 'Endereço não informado';
   }
 
   // =====================================================
@@ -1234,25 +1235,24 @@ export class ConsultaEmpresasComponent implements OnInit {
         // =================================================
 
         const razaoSocial = doc.splitTextToSize(
-          empresa.razao_social,
+          empresa.razao_social || 'Razão social não informada',
           larguraCard - 28,
         );
 
         const cnpj = this.formatarCnpj(empresa.cnpj);
-
         const nomeFantasia = empresa.nome_fantasia || 'Não informado';
-
-        const porte = empresa.porte_descricao || 'Não informado';
-
-        const municipio = `${empresa.municipio}/${empresa.uf}`;
-
+        const porte =
+          empresa.porte_descricao || empresa.porte || 'Não informado';
+        const municipio = empresa.municipio
+          ? `${empresa.municipio}/CE`
+          : 'Não informado';
+        const regiao = empresa.regiao || 'Não informada';
         const telefone = this.formatarTelefone(
-          empresa.ddd_1,
-          empresa.telefone_1,
+          empresa.ddd_telefone,
+          empresa.telefone,
         );
 
         const email = empresa.email || 'Não informado';
-
         const enderecoTexto = this.enderecoCompleto(empresa);
 
         // =================================================
@@ -1263,6 +1263,7 @@ export class ConsultaEmpresasComponent implements OnInit {
         const fantasiaLinhas = doc.splitTextToSize(nomeFantasia, larguraColuna);
         const porteLinhas = doc.splitTextToSize(porte, larguraColuna);
         const municipioLinhas = doc.splitTextToSize(municipio, larguraColuna);
+        const regiaoLinhas = doc.splitTextToSize(regiao, larguraColuna);
         const telefoneLinhas = doc.splitTextToSize(telefone, larguraColuna);
         const emailLinhas = doc.splitTextToSize(email, larguraColuna);
         const enderecoLinhas = doc.splitTextToSize(
@@ -1290,6 +1291,7 @@ export class ConsultaEmpresasComponent implements OnInit {
 
         const alturaColunaDireita =
           alturaCampo(municipioLinhas) +
+          alturaCampo(regiaoLinhas) +
           alturaCampo(telefoneLinhas) +
           alturaCampo(emailLinhas);
 
@@ -1467,6 +1469,13 @@ export class ConsultaEmpresasComponent implements OnInit {
         );
 
         yDireita = escreverCampo(
+          'Região',
+          regiaoLinhas,
+          colunaDireitaX,
+          yDireita,
+        );
+
+        yDireita = escreverCampo(
           'Telefone',
           telefoneLinhas,
           colunaDireitaX,
@@ -1625,36 +1634,6 @@ export class ConsultaEmpresasComponent implements OnInit {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
-  }
-
-  private adicionarCampoPdf(
-    doc: jsPDF,
-    label: string,
-    valor: string,
-    y: number,
-    margem: number,
-    larguraPagina: number,
-  ): number {
-    doc.setFont('helvetica', 'bold');
-
-    doc.text(`${label}:`, margem, y);
-
-    y += 4.5;
-
-    doc.setFont('helvetica', 'normal');
-
-    const linhas = doc.splitTextToSize(
-      valor || 'Não informado',
-      larguraPagina - margem * 2,
-    );
-
-    doc.text(linhas, margem, y);
-
-    y += linhas.length * 4.5;
-
-    y += 2;
-
-    return y;
   }
 
   // =====================================================

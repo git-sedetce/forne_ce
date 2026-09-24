@@ -5,6 +5,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { environment } from '../../environments/environment.development';
 import { CnaeResponse } from '../interfaces/cnae.interface';
 import { EmpresasPesquisaResponse } from '../interfaces/empresa-pesquisa.interface';
+import { EmpresasJucecResponse } from '../interfaces/empresa-jucec.interface';
 
 @Injectable({
   providedIn: 'root',
@@ -112,4 +113,46 @@ export class EmpresaService {
     });
   }
 
+  // =====================================================
+  // PESQUISA DE EMPRESAS - JUCEC
+  // =====================================================
+
+  pesquisarEmpresasJucec(
+    page: number = 1,
+    limit: number = 20,
+
+    filtros: {
+      cnae?: string;
+      regiao?: string;
+      municipio?: string;
+      porte?: string;
+    },
+  ): Observable<EmpresasJucecResponse> {
+    let params = new HttpParams()
+      .set('page', String(page))
+      .set('limit', String(limit));
+
+    if (filtros.cnae?.trim()) {
+      params = params.set('cnae', filtros.cnae.trim());
+    }
+
+    if (filtros.regiao?.trim()) {
+      params = params.set('regiao', filtros.regiao.trim());
+    }
+
+    if (filtros.municipio?.trim()) {
+      params = params.set('municipio', filtros.municipio.trim());
+    }
+
+    if (filtros.porte?.trim()) {
+      params = params.set('porte', filtros.porte.trim());
+    }
+
+    return this.http.get<EmpresasJucecResponse>(
+      `${this.apiUrl}/empresas/pesquisarjucec`,
+      {
+        params,
+      },
+    );
+  }
 }

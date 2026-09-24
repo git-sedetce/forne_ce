@@ -19,7 +19,10 @@
         </h1>
 
         <p>
-          Localize empresas ativas no Ceará utilizando atividade econômica, CNAE, região, município e porte.
+          Consulte empresas registradas na JUCEC por atividade
+          econômica, região, município e porte.
+          A classificação CNAE utilizada na pesquisa segue o
+          catálogo nacional de atividades econômicas.
         </p>
 
       </div>
@@ -211,7 +214,7 @@
                 Todos os portes
               </option>
 
-              <option value="01">
+              <!-- <option value="01">
                 Micro Empresa
               </option>
 
@@ -221,15 +224,26 @@
 
               <option value="05">
                 Demais
+              </option> -->
+
+              <option value="ME">
+                Microempresa
               </option>
 
-              <option value="00">
-                Não informado
+              <option value="EPP">
+                Empresa de Pequeno Porte
+              </option>
+
+              <option value="NORMAL">
+                Normal
               </option>
             </select>
           </div>
-          <small>
+          <!-- <small>
             Filtre pelo porte cadastrado na Receita Federal.
+          </small> -->
+          <small>
+            Filtre pelo porte informado pela JUCEC.
           </small>
         </div>
 
@@ -381,22 +395,37 @@
         =========================================== -->
 
         <div class="result-numbers">
+
           <div>
             <span>
-              Empresas encontradas
+              Registros encontrados
             </span>
+
             <strong>
               {{ totalItens | number:'1.0-0' }}
             </strong>
           </div>
+
           <div>
             <span>
               Competência
             </span>
+
             <strong>
               {{ competencia }}
             </strong>
           </div>
+
+          <div>
+            <span>
+              Fonte
+            </span>
+
+            <strong>
+              JUCEC
+            </strong>
+          </div>
+
         </div>
       </div>
 
@@ -465,16 +494,16 @@
         <div class="companies-column">
 
           <article class="company-card" *ngFor="let empresa of empresas; trackBy: trackByEmpresa"
-            [class.selected]="empresaSelecionada(empresa.cnpj)"
-            [class.selection-disabled]="!empresaPodeSerSelecionada(empresa.cnpj)">
+            [class.selected]="empresaSelecionada(empresa.ocorrencia_id)"
+            [class.selection-disabled]="!empresaPodeSerSelecionada(empresa.ocorrencia_id)">
 
             <!-- checkbox -->
 
             <div class="company-checkbox">
 
-              <input type="checkbox" [checked]="empresaSelecionada(empresa.cnpj)"
-                [disabled]="!empresaPodeSerSelecionada(empresa.cnpj)" (change)="selecionarEmpresa(empresa, $event)">
-
+              <input type="checkbox" [checked]="empresaSelecionada(empresa.ocorrencia_id)"
+                [disabled]="!empresaPodeSerSelecionada(empresa.ocorrencia_id)"
+                (change)="selecionarEmpresa(empresa,$event)">
             </div>
 
 
@@ -505,16 +534,13 @@
 
 
                 <div class="company-badges">
-
-                  <span class="badge-active">
+                  <span class="badge-active" *ngIf="empresa.status === 'ATIVA'">
                     <i class="fa-solid fa-circle"></i>
-                    ATIVA
+                    {{ empresa.status }}
                   </span>
-
                   <span class="badge-type">
-                    {{ empresa.tipo_estabelecimento }}
+                    JUCEC
                   </span>
-
                 </div>
 
               </div>
@@ -525,103 +551,94 @@
                 <!-- MUNICÍPIO -->
 
                 <div class="info-item">
-
                   <i class="fa-solid fa-location-dot"></i>
-
                   <div>
-
                     <span>Localização</span>
-
                     <strong>
-                      {{ empresa.municipio }}/{{ empresa.uf }}
+                      {{ empresa.municipio || 'Município não informado' }}/CE
                     </strong>
-
                     <small>
-                      {{ empresa.bairro || 'Bairro não informado' }}
+                      {{ empresa.regiao || 'Região não informada' }}
                     </small>
-
                   </div>
-
                 </div>
 
 
                 <!-- TELEFONE -->
 
                 <div class="info-item">
-
                   <i class="fa-solid fa-phone"></i>
-
                   <div>
-
                     <span>Telefone</span>
-
                     <strong>
                       {{
                       formatarTelefone(
-                      empresa.ddd_1,
-                      empresa.telefone_1
+                      empresa.ddd_telefone,
+                      empresa.telefone
                       )
                       }}
                     </strong>
-
                   </div>
-
                 </div>
 
 
                 <!-- EMAIL -->
 
                 <div class="info-item">
-
                   <i class="fa-solid fa-envelope"></i>
-
                   <div>
-
                     <span>E-mail</span>
-
                     <strong>
                       {{
                       empresa.email ||
                       'Não informado'
                       }}
                     </strong>
-
                   </div>
-
                 </div>
 
 
                 <!-- PORTE -->
 
                 <div class="info-item">
-
                   <i class="fa-solid fa-building"></i>
-
                   <div>
-
                     <span>Porte</span>
-
                     <strong>
                       {{ empresa.porte_descricao }}
                     </strong>
-
                   </div>
+                </div>
+              </div>
 
+              <div class="company-cnaes" *ngIf="empresa.cnaes?.length">
+                <div class="company-cnaes-header">
+                  <i class="fa-solid fa-list"></i>
+
+                  <span>
+                    Atividades econômicas informadas pela JUCEC
+                  </span>
                 </div>
 
+                <div class="company-cnaes-list">
+
+                  <span class="company-cnae" *ngFor="let item of empresa.cnaes">
+                    <strong>
+                      {{ formatarCnae(item.codigo) }}
+                    </strong>
+
+                    {{ item.descricao }}
+                  </span>
+
+                </div>
               </div>
 
 
               <div class="company-address">
-
                 <i class="fa-solid fa-map-location-dot"></i>
-
                 {{ enderecoCompleto(empresa) }}
-
               </div>
-
             </div>
-
           </article>
 
 
@@ -630,16 +647,12 @@
           =============================================== -->
 
           <div class="pagination-area">
-
             <div class="pagination-info">
-
               Página
               <strong>{{ pagina }}</strong>
               de
               <strong>{{ totalPaginas }}</strong>
-
             </div>
-
 
             <div class="pagination">
 
@@ -777,14 +790,10 @@
               </div>
 
 
-              <button type="button" (click)="removerSelecionada(empresa.cnpj)">
-
+              <button type="button" (click)="removerSelecionada(empresa.ocorrencia_id)">
                 <i class="fa-solid fa-xmark"></i>
-
               </button>
-
             </div>
-
           </div>
 
 
@@ -824,8 +833,7 @@
         </h3>
 
         <p>
-          Não encontramos empresas ativas para os
-          critérios informados.
+          Não encontramos registros com status ATIVA na JUCEC para os critérios informados.
         </p>
 
       </div>
@@ -874,7 +882,7 @@
          LOGOS
     ================================================== -->
 
-    <div class="contact-modal-brands" *ngIf="exibirLogosInstitucionais">
+    <div class="contact-modal-brands">
 
       <div class="brand-fornece">
 
@@ -884,7 +892,7 @@
 
       <div class="brand-divider"></div>
 
-      <div class="brand-sde">
+      <div class="brand-sde" *ngIf="exibirLogosInstitucionais">
 
         <img src="assets/imgs/Logo-SDE---Horizontal.png" alt="Secretaria do Desenvolvimento Econômico do Ceará">
 
@@ -1103,12 +1111,15 @@
               </span>
 
               <small>
-                {{ empresa.municipio }}/{{ empresa.uf }}
+                {{ empresa.municipio || 'Município não informado' }}/CE
+                <ng-container *ngIf="empresa.regiao">
+                  • {{ empresa.regiao }}
+                </ng-container>
               </small>
 
             </div>
 
-            <button type="button" (click)="removerSelecionada(empresa.cnpj)" title="Remover">
+            <button type="button" (click)="removerSelecionada(empresa.ocorrencia_id)" title="Remover">
               <i class="fa-solid fa-xmark"></i>
             </button>
           </div>

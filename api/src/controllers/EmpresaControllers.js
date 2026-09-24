@@ -2239,6 +2239,474 @@ class EmpresaControllers {
       });
     }
   }
+
+  static async pesquisarEmpresasJucec(req, res) {
+    try {
+      // =====================================================
+      // FILTROS
+      // =====================================================
+
+      const cnae = String(req.query.cnae || "").replace(/\D/g, "");
+
+      const municipio = String(req.query.municipio || "").trim();
+
+      const porte = String(req.query.porte || "")
+        .trim()
+        .toUpperCase();
+
+      const regiao = String(req.query.regiao || "").trim();
+
+      /*
+       * Mantido por compatibilidade com o frontend atual.
+       *
+       * municipios=Fortaleza|Caucaia|Maracanau|...
+       *
+       * Entretanto, como a JUCEC já possui a coluna regiao,
+       * a pesquisa principal por região poderá utilizar
+       * diretamente je.regiao.
+       */
+      const municipios = String(req.query.municipios || "")
+        .split("|")
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+      // =====================================================
+      // PAGINAÇÃO
+      // =====================================================
+
+      const page = Math.max(Number.parseInt(req.query.page, 10) || 1, 1);
+
+      const limit = Math.min(
+        Math.max(Number.parseInt(req.query.limit, 10) || 20, 1),
+        100,
+      );
+
+      const offset = (page - 1) * limit;
+
+      // =====================================================
+      // VALIDAÇÕES
+      // =====================================================
+
+      if (cnae && cnae.length !== 7) {
+        return res.status(400).json({
+          message: "O CNAE deve conter exatamente sete números.",
+        });
+      }
+
+      /*
+       * Na JUCEC o porte é textual.
+       *
+       * Valores observados na carga:
+       * ME
+       * EPP
+       * NORMAL
+       */
+      const portesValidos = ["", "ME", "EPP", "NORMAL"];
+
+      if (!portesValidos.includes(porte)) {
+        return res.status(400).json({
+          message: "Porte da empresa inválido.",
+        });
+      }
+
+      /*
+       * Evita consulta irrestrita de todas as ocorrências
+       * ativas da JUCEC.
+       */
+      if (!cnae && !municipio && !regiao && !porte) {
+        return res.status(400).json({
+          message: "Informe pelo menos um filtro para realizar a pesquisa.",
+        });
+      }
+
+      // =====================================================
+      // COMPETÊNCIA JUCEC
+      // =====================================================
+
+      /*
+       * IMPORTANTE:
+       *
+       * Não utilizar obterCompetencia() da Receita caso ela
+       * consulte public.estabelecimentos.
+       *
+       * A competência deve ser obtida exclusivamente da
+       * public.junta_empresas.
+       */
+      const competencia = await EmpresaControllers.obterCompetenciaJucec(
+        req.query.competencia,
+      );
+
+      if (!competencia) {
+        return res.status(404).json({
+          message: "Nenhuma competência da JUCEC encontrada.",
+        });
+      }
+
+      // =====================================================
+      // REPLACEMENTS
+      // =====================================================
+
+      const replacements = {
+        competencia,
+        limit,
+        offset,
+      };
+
+      // =====================================================
+      // WHERE DINÂMICO
+      // =====================================================
+
+      const where = [
+        "je.competencia = :competencia",
+
+        /*
+         * ATENÇÃO:
+         * ATIVA aqui significa situação informada pela JUCEC.
+         * Não é uma conversão do código 02 da Receita.
+         */
+        "je.status = 'ATIVA'",
+      ];
+
+      // -----------------------------------------------------
+      // CNAE
+      // -----------------------------------------------------
+
+      /*
+       * A JUCEC fornece uma lista de CNAEs.
+       *
+       * Não classificamos nenhum deles como principal.
+       *
+       * EXISTS evita multiplicar a ocorrência caso ela
+       * possua vários CNAEs.
+       */
+      if (cnae) {
+        where.push(`
+        EXISTS (
+          SELECT 1
+
+          FROM public.junta_empresa_cnaes jec
+
+          WHERE jec.junta_empresa_id = je.id
+            AND jec.cnae_codigo = :cnae
+        )
+      `);
+
+        replacements.cnae = cnae;
+      }
+
+      // -----------------------------------------------------
+      // MUNICÍPIO ESPECÍFICO
+      // -----------------------------------------------------
+
+      if (municipio) {
+        where.push("UPPER(TRIM(je.municipio)) = :municipio");
+
+        replacements.municipio = municipio.toUpperCase();
+      }
+
+      // -----------------------------------------------------
+      // REGIÃO
+      // -----------------------------------------------------
+
+      /*
+       * Diferentemente da Receita, a JUCEC já possui
+       * a região diretamente no registro.
+       *
+       * Portanto não precisamos inferir região por uma
+       * lista de municípios.
+       */
+      if (regiao && !municipio) {
+        where.push("UPPER(TRIM(je.regiao)) = :regiao");
+
+        replacements.regiao = regiao.toUpperCase();
+      }
+
+      // -----------------------------------------------------
+      // PORTE
+      // -----------------------------------------------------
+
+      if (porte) {
+        where.push("UPPER(TRIM(je.porte)) = :porte");
+
+        replacements.porte = porte;
+      }
+
+      const whereSql = where.join("\n AND ");
+
+      // =====================================================
+      // TOTAL
+      // =====================================================
+
+      /*
+       * IMPORTANTE:
+       *
+       * Não usar COUNT(DISTINCT cnpj).
+       *
+       * A unidade desta consulta é a OCORRÊNCIA JUCEC.
+       * Portanto contamos je.id.
+       */
+      const totalResultado = await database.sequelize.query(
+        `
+          SELECT
+            COUNT(je.id)::BIGINT AS total
+
+          FROM public.junta_empresas je
+
+          WHERE
+            ${whereSql}
+        `,
+        {
+          replacements,
+          type: QueryTypes.SELECT,
+        },
+      );
+
+      // =====================================================
+      // CONSULTA
+      // =====================================================
+
+      const empresas = await database.sequelize.query(
+        `
+          SELECT
+            -- ---------------------------------------------
+            -- IDENTIFICAÇÃO DA OCORRÊNCIA
+            -- ---------------------------------------------
+
+            je.id AS ocorrencia_id,
+            je.ocorrencia_arquivo,
+            je.cnpj,
+
+            -- ---------------------------------------------
+            -- EMPRESA
+            -- ---------------------------------------------
+
+            je.razao_social,
+            je.nome_fantasia,
+
+            -- ---------------------------------------------
+            -- SITUAÇÃO JUCEC
+            -- ---------------------------------------------
+
+            je.status,
+
+            je.porte,
+
+            CASE
+              WHEN je.porte = 'ME'
+                THEN 'MICROEMPRESA'
+
+              WHEN je.porte = 'EPP'
+                THEN 'EMPRESA DE PEQUENO PORTE'
+
+              WHEN je.porte = 'NORMAL'
+                THEN 'NORMAL'
+
+              ELSE 'NÃO INFORMADO'
+            END AS porte_descricao,
+
+            -- ---------------------------------------------
+            -- LOCALIZAÇÃO
+            -- ---------------------------------------------
+
+            je.municipio,
+            je.regiao,
+
+            -- ---------------------------------------------
+            -- ENDEREÇO
+            -- ---------------------------------------------
+
+            je.tipo_logradouro,
+            je.logradouro,
+            je.numero,
+            je.bairro,
+
+            -- ---------------------------------------------
+            -- CONTATO
+            -- ---------------------------------------------
+
+            je.ddd_telefone,
+            je.telefone,
+            je.email,
+
+            -- ---------------------------------------------
+            -- SIMPLES
+            -- ---------------------------------------------
+
+            je.opcao_simples_nacional,
+
+            -- ---------------------------------------------
+            -- DATAS
+            -- ---------------------------------------------
+
+            je.data_abertura,
+            je.data_encerramento,
+
+            -- ---------------------------------------------
+            -- CONTROLE
+            -- ---------------------------------------------
+
+            je.competencia,
+
+            -- ---------------------------------------------
+            -- CNAES DA OCORRÊNCIA
+            -- ---------------------------------------------
+
+            COALESCE(
+              (
+                SELECT json_agg(
+                  json_build_object(
+                    'codigo',
+                    jec.cnae_codigo,
+
+                    'descricao',
+                    c.descricao,
+
+                    'ordem',
+                    jec.ordem
+                  )
+                  ORDER BY jec.ordem
+                )
+
+                FROM public.junta_empresa_cnaes jec
+
+                INNER JOIN public.cnaes c
+                  ON c.codigo = jec.cnae_codigo
+
+                WHERE
+                  jec.junta_empresa_id = je.id
+              ),
+              '[]'::json
+            ) AS cnaes
+
+          FROM public.junta_empresas je
+
+          WHERE
+            ${whereSql}
+
+          ORDER BY
+            je.razao_social ASC,
+            je.cnpj ASC,
+            je.id ASC
+
+          LIMIT :limit
+          OFFSET :offset
+        `,
+        {
+          replacements,
+          type: QueryTypes.SELECT,
+        },
+      );
+
+      // =====================================================
+      // PAGINAÇÃO
+      // =====================================================
+
+      const totalItens = Number(totalResultado[0]?.total || 0);
+
+      // =====================================================
+      // RESPONSE
+      // =====================================================
+
+      return res.status(200).json({
+        fonte: "JUCEC",
+
+        filtros: {
+          cnae: cnae || null,
+
+          cnae_formatado: cnae ? EmpresaControllers.formatarCnae(cnae) : null,
+
+          regiao: regiao || null,
+          municipio: municipio || null,
+          porte: porte || null,
+
+          competencia,
+
+          status: "ATIVA",
+
+          /*
+           * Diferentemente da Receita, não afirmamos
+           * que o CNAE encontrado é principal.
+           */
+          criterio_cnae: cnae ? "qualquer_cnae_informado_pela_jucec" : null,
+        },
+
+        paginacao: {
+          pagina: page,
+          limite: limit,
+          total_itens: totalItens,
+          total_paginas: Math.ceil(totalItens / limit),
+        },
+
+        dados: empresas,
+      });
+    } catch (error) {
+      console.error("Erro ao pesquisar empresas na JUCEC:", error);
+
+      return res.status(error.status || 500).json({
+        message: error.message || "Erro ao pesquisar empresas na JUCEC.",
+      });
+    }
+  }
+
+  static async obterCompetenciaJucec(competenciaInformada = null) {
+    // =====================================================
+    // COMPETÊNCIA INFORMADA
+    // =====================================================
+
+    if (competenciaInformada) {
+      const competencia = String(competenciaInformada).trim();
+
+      if (!/^\d{4}-\d{2}$/.test(competencia)) {
+        const error = new Error(
+          "Competência inválida. Utilize o formato YYYY-MM.",
+        );
+
+        error.status = 400;
+
+        throw error;
+      }
+
+      const resultado = await database.sequelize.query(
+        `
+          SELECT competencia
+
+          FROM public.junta_empresas
+
+          WHERE competencia = :competencia
+
+          LIMIT 1
+        `,
+        {
+          replacements: {
+            competencia,
+          },
+          type: QueryTypes.SELECT,
+        },
+      );
+
+      if (!resultado.length) {
+        return null;
+      }
+
+      return resultado[0].competencia;
+    }
+
+    // =====================================================
+    // ÚLTIMA COMPETÊNCIA DISPONÍVEL
+    // =====================================================
+
+    const resultado = await database.sequelize.query(
+      `
+        SELECT MAX(competencia) AS competencia
+        FROM public.junta_empresas
+      `,
+      {
+        type: QueryTypes.SELECT,
+      },
+    );
+
+    return resultado[0]?.competencia || null;
+  }
 }
 
 module.exports = EmpresaControllers;

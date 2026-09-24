@@ -12,6 +12,7 @@ router.get("/cnae/:cnae", auth.authenticatedUser, checkRole.checkRole([1,2,3,4,5
 router.get("/listarcnae/cnae", auth.authenticatedUser, checkRole.checkRole([1,2,3,4,5,6]), EmpresaControllers.listarCnaes );
 router.get("/listarempresas/ativas", EmpresaControllers.listarEmpresasAtivas );
 router.get("/empresas/pesquisar", EmpresaControllers.pesquisarEmpresas);
+router.get("/empresas/pesquisarjucec", EmpresaControllers.pesquisarEmpresasJucec);
 router.get("/estatisticas/indicadores", EmpresaControllers.indicadoresDashboard );
 
 module.exports = router;
