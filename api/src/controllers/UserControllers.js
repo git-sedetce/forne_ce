@@ -100,8 +100,8 @@ class UserController {
       <h2>Código PIN</h2>
       <h3>${user.user_pin}</h3>
       <p>
-        <a href="https://www.fornece.ce.gov.br/resetSenha">
-          Clique aqui para criar sua senha
+        <a href="https://www.fornece.sde.ce.gov.br/firstlogin">
+          Clique aqui para o primeiro acesso
         </a>
       </p>
     `,
@@ -160,7 +160,7 @@ class UserController {
         from: "cotec@sde.ce.gov.br",
         to: user.user_email,
         subject: "Novo Pin para nova senha",
-        html: `<h3>Segue o novo Pin!!</h3><p><strong>${newPin}</strong><br>Crie sua nova senha no seguinte link: <a href="https://www.fornece.ce.gov.br/resetSenha">Resetar Senha</a>`,
+        html: `<h3>Segue o novo Pin!!</h3><p><strong>${newPin}</strong><br>Crie sua nova senha no seguinte link: <a href="https://www.fornece.sde.ce.gov.br/resetSenha">Resetar Senha</a>`,
       };
       //   console.log("mailOptions", mailOptions);
       var emailRetorno = null;
