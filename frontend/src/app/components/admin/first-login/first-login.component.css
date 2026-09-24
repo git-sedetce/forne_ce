@@ -1,0 +1,339 @@
+:host {
+  display: block;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.auth-page {
+  min-height: 100vh;
+
+  padding: 35px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background:
+    radial-gradient(
+      circle at top right,
+      rgba(255, 101, 0, 0.10),
+      transparent 30%
+    ),
+    radial-gradient(
+      circle at bottom left,
+      rgba(7, 87, 107, 0.12),
+      transparent 35%
+    ),
+    #f5f7f8;
+}
+
+.reset-card {
+  width: 100%;
+  max-width: 580px;
+
+  overflow: hidden;
+
+  border-radius: 26px;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 25px 65px rgba(0, 0, 0, 0.12);
+}
+
+.reset-brand {
+  min-height: 145px;
+
+  padding: 30px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background:
+    linear-gradient(
+      135deg,
+      #043f4e,
+      #07576b
+    );
+}
+
+.reset-brand img {
+  width: 100%;
+  max-width: 320px;
+}
+
+.reset-content {
+  padding: 42px 48px;
+}
+
+.reset-header {
+  text-align: center;
+
+  margin-bottom: 35px;
+}
+
+.reset-icon {
+  width: 62px;
+  height: 62px;
+
+  margin: 0 auto 18px;
+
+  border-radius: 18px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: #fff0e5;
+
+  color: #ff6500;
+
+  font-size: 1.45rem;
+}
+
+.reset-header small {
+  display: block;
+
+  color: #07576b;
+
+  font-size: 0.75rem;
+  font-weight: 800;
+
+  text-transform: uppercase;
+  letter-spacing: 1.7px;
+
+  margin-bottom: 5px;
+}
+
+.reset-header h1 {
+  margin: 0;
+
+  color: #292929;
+
+  font-size: 1.9rem;
+
+  font-weight: 800;
+}
+
+.reset-header p {
+  max-width: 390px;
+
+  margin: 10px auto 0;
+
+  color: #747474;
+
+  line-height: 1.6;
+}
+
+
+/* FORM */
+
+.form-group label {
+  display: block;
+
+  margin-bottom: 8px;
+
+  color: #363636;
+
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.field-spacing {
+  margin-top: 22px;
+}
+
+.input-wrapper {
+  min-height: 52px;
+
+  position: relative;
+
+  display: flex;
+  align-items: center;
+
+  border: 1px solid #d8dde0;
+
+  border-radius: 12px;
+
+  background: #fff;
+
+  transition: 0.2s;
+}
+
+.input-wrapper:focus-within {
+  border-color: #07576b;
+
+  box-shadow:
+    0 0 0 4px rgba(7, 87, 107, 0.08);
+}
+
+.input-wrapper > i {
+  width: 48px;
+
+  text-align: center;
+
+  color: #899396;
+}
+
+.input-wrapper input {
+  width: 100%;
+  height: 50px;
+
+  border: 0;
+  outline: 0;
+
+  padding: 0 14px 0 0;
+
+  background: transparent;
+
+  color: #333;
+
+  font-size: 0.92rem;
+}
+
+.password-toggle {
+  width: 48px;
+  height: 50px;
+
+  border: 0;
+
+  background: transparent;
+
+  color: #7b8589;
+
+  cursor: pointer;
+}
+
+.field-help {
+  display: block;
+
+  margin-top: 7px;
+
+  color: #949494;
+
+  font-size: 0.76rem;
+}
+
+
+/* BOTÃO */
+
+.btn-primary {
+  width: 100%;
+  min-height: 54px;
+
+  margin-top: 30px;
+
+  border: 0;
+  border-radius: 12px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+
+  background:
+    linear-gradient(
+      135deg,
+      #07576b,
+      #043f4e
+    );
+
+  color: #fff;
+
+  font-weight: 800;
+
+  cursor: pointer;
+
+  transition: 0.2s;
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+
+  box-shadow:
+    0 10px 25px rgba(7, 87, 107, 0.25);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+
+  cursor: not-allowed;
+}
+
+.reset-footer {
+  margin-top: 28px;
+
+  text-align: center;
+}
+
+.reset-footer a {
+  color: #07576b;
+
+  text-decoration: none;
+
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.reset-footer a i {
+  margin-right: 7px;
+}
+
+
+/* TABLET */
+
+@media (max-width: 768px) {
+
+  .auth-page {
+    padding: 22px;
+  }
+
+  .reset-content {
+    padding: 38px 35px;
+  }
+
+}
+
+
+/* CELULAR */
+
+@media (max-width: 480px) {
+
+  .auth-page {
+    padding: 0;
+
+    align-items: stretch;
+
+    background: #ffffff;
+  }
+
+  .reset-card {
+    max-width: none;
+
+    border-radius: 0;
+
+    box-shadow: none;
+  }
+
+  .reset-brand {
+    min-height: 125px;
+
+    padding: 25px 30px;
+  }
+
+  .reset-brand img {
+    max-width: 250px;
+  }
+
+  .reset-content {
+    padding: 34px 22px 45px;
+  }
+
+  .reset-header h1 {
+    font-size: 1.6rem;
+  }
+
+}

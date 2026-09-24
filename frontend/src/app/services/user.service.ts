@@ -123,6 +123,18 @@ export class UserService {
 
   // ------ AUTENTICAÇÃO ------ //
 
+  primeirologin(data: any): Observable<any> {
+    return this.http.post<any>(environment.apiUrl + 'primeirologin', data).pipe(
+      tap((response) => {
+        localStorage.setItem('access_token', response.token);
+        const decoded = jwtDecode<JwtPayload>(response.token);
+        // console.log('TOKEN DECODIFICADO:', decoded);
+        this.userSubject.next(decoded);
+        this.redirecionarPorPerfil();
+      }),
+    );
+  }
+
   login(data: any): Observable<any> {
     return this.http.post<any>(environment.apiUrl + 'login', data).pipe(
       tap((response) => {

@@ -20,13 +20,13 @@ class UserController {
         });
       }
 
-      const dominio = user_email.split("@")[1]?.toLowerCase();
+      // const dominio = user_email.split("@")[1]?.toLowerCase();
 
-      if (dominio !== "sde.ce.gov.br") {
-        return res.status(400).json({
-          message: "Email inválido para cadastro!",
-        });
-      }
+      // if (dominio !== "sde.ce.gov.br") {
+      //   return res.status(400).json({
+      //     message: "Email inválido para cadastro!",
+      //   });
+      // }
 
       const emailExistente = await database.users.findOne({
         where: {
@@ -83,7 +83,7 @@ class UserController {
     // Email administrativo
     await transporter.sendMail({
       from: "cotec@sde.ce.gov.br",
-      to: process.env.EMAIL_ADMIN,
+      to: process.env.ADMIN_EMAIL,
       subject: "Cadastro de usuário ao Sistema Fornece Ceará",
       html: `
       <h3>Cadastro realizado com sucesso</h3>
@@ -290,6 +290,153 @@ class UserController {
 
     return res.status(500).json({
       message: "Problemas ao realizar login!",
+    });
+  }
+}
+
+static async firstLogin(req, res) {
+  const {
+    user_email,
+    user_password,
+    user_pin,
+  } = req.body;
+
+  try {
+    // =====================================================
+    // 1. VALIDAÇÃO
+    // =====================================================
+    if (!user_email || !user_password || !user_pin) {
+      return res.status(400).json({
+        message: "Informe o e-mail/CPF/CNPJ, a senha e o PIN.",
+      });
+    }
+
+    // Campo user_email pode receber:
+    // - E-mail
+    // - CPF
+    // - CNPJ
+    const usuarioInformado = String(user_email).trim();
+
+    const isEmail = usuarioInformado.includes("@");
+
+    // Remove máscara caso seja CPF/CNPJ
+    const documento = usuarioInformado.replace(/\D/g, "");
+
+    // =====================================================
+    // 2. BUSCA USUÁRIO
+    // =====================================================
+    let verificaUser;
+
+    if (isEmail) {
+      verificaUser = await database.users.findOne({
+        where: {
+          user_email: usuarioInformado.toLowerCase(),
+        },
+      });
+    } else {
+      verificaUser = await database.users.findOne({
+        where: {
+          cpf_cnpj: documento,
+        },
+      });
+    }
+
+    // =====================================================
+    // 3. USUÁRIO NÃO ENCONTRADO
+    // =====================================================
+    if (!verificaUser) {
+      return res.status(404).json({
+        message: "Usuário não encontrado!",
+      });
+    }
+
+    // =====================================================
+    // 4. VERIFICA SE JÁ ESTÁ ATIVO
+    // =====================================================
+    if (verificaUser.user_active === true) {
+      return res.status(409).json({
+        message:
+          "Primeiro acesso já realizado. Utilize a tela de login.",
+      });
+    }
+
+    // =====================================================
+    // 5. VERIFICA SENHA
+    // =====================================================
+    const senhaCorreta = await bcrypt.compare(
+      String(user_password),
+      verificaUser.user_password
+    );
+
+    if (!senhaCorreta) {
+      return res.status(401).json({
+        message: "E-mail/CPF/CNPJ, senha ou PIN inválidos!",
+      });
+    }
+
+    // =====================================================
+    // 6. VERIFICA PIN
+    // =====================================================
+    const pinCorreto =
+      String(user_pin).trim() ===
+      String(verificaUser.user_pin).trim();
+
+    if (!pinCorreto) {
+      return res.status(401).json({
+        message: "E-mail/CPF/CNPJ, senha ou PIN inválidos!",
+      });
+    }
+
+    // =====================================================
+    // 7. ATIVA O USUÁRIO
+    // =====================================================
+    await verificaUser.update({
+      user_active: true,
+    });
+
+    // =====================================================
+    // 8. GERA TOKEN
+    // =====================================================
+    const token = jwt.sign(
+      {
+        _id: verificaUser.id,
+        _profile_id: verificaUser.profile_id,
+        _user_name: verificaUser.nome_representante,
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: process.env.JWT_EXPIRES_IN || "8h",
+      }
+    );
+
+    // =====================================================
+    // 9. RETORNO
+    // =====================================================
+    return res.status(200).json({
+      auth: true,
+
+      token,
+
+      user: {
+        id: verificaUser.id,
+        nome: verificaUser.nome_representante,
+        email: verificaUser.user_email,
+        profile_id: verificaUser.profile_id,
+        sexec_id: verificaUser.sexec_id,
+        user_active: true,
+      },
+
+      message: "Primeiro acesso realizado com sucesso!",
+    });
+
+  } catch (error) {
+    console.error(
+      "Erro ao realizar primeiro acesso:",
+      error
+    );
+
+    return res.status(500).json({
+      message: "Problemas ao realizar o primeiro acesso!",
     });
   }
 }

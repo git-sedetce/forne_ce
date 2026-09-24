@@ -31,8 +31,8 @@ export class LoginComponent {
     // console.log('loginUser', this.loginUsers)
     this.userService.login(this.loginUsers).subscribe({
       next: (res) => res,
-      error: (e) => (console.error('error', e), this.loginForm.reset())
-      // error: (e) => (this.toastr.error(e.error.message), console.error('error', e), this.loginForm.reset())
+      // error: (e) => (console.error('error', e), this.loginForm.reset())
+      error: (e) => (this.toastr.error(e.error.message), console.error('error', e), this.loginForm.reset())
     })
 
   }

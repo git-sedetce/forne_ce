@@ -131,7 +131,7 @@ export class HomeComponent implements OnDestroy, OnInit {
         this.carregarGeoJson();
         this.loading = false;
 
-        console.log('Resultado:', resultado);
+        // console.log('Resultado:', resultado);
       },
 
       error: (error) => {

@@ -52,12 +52,12 @@ export class RegisterComponent implements OnInit {
   }
 
   cadastrar(): void {
-    this.user.user_password = this.serviceUser.CriptografarMD5(
-      this.user.user_password,
-    );
-    this.user.confirm_password = this.serviceUser.CriptografarMD5(
-      this.user.confirm_password,
-    );
+    // this.user.user_password = this.serviceUser.CriptografarMD5(
+    //   this.user.user_password,
+    // );
+    // this.user.confirm_password = this.serviceUser.CriptografarMD5(
+    //   this.user.confirm_password,
+    // );
 
     // console.log('user', this.user);
 

@@ -10,28 +10,16 @@ import { roleGuard } from './services/guards/role.guard';
 import { ConsultaEmpresasComponent } from './components/empresa/consulta-empresas/consulta-empresas.component';
 import { SobreComponent } from './components/sobre/sobre.component';
 import { IndicadoresComponent } from './components/indicadores/indicadores.component';
+import { FirstLoginComponent } from './components/admin/first-login/first-login.component';
 
 const routes: Routes = [
-  {
-    path: '',
-    component: HomeComponent,
-  },
-  {
-    path: 'login',
-    component: LoginComponent,
-  },
-  {
-    path: 'cadastro',
-    component: RegisterComponent,
-  },
-  {
-    path: 'reset-senha',
-    component: ResetSenhaComponent,
-  },
-  {
-    path: 'sobre',
-    component: SobreComponent,
-  },
+  { path: 'home', component: HomeComponent },
+  { path: '', redirectTo: 'home', pathMatch: 'full' },
+  { path: 'login', component: LoginComponent },
+  { path: 'cadastro', component: RegisterComponent },
+  { path: 'reset-senha', component: ResetSenhaComponent },
+  { path: 'sobre', component: SobreComponent },
+  { path: 'firstlogin', component: FirstLoginComponent },
   {
     path: 'indicadores',
     component: IndicadoresComponent,

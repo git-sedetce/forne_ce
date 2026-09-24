@@ -24,6 +24,7 @@ import { ConsultaEmpresasComponent } from './components/empresa/consulta-empresa
 import { SobreComponent } from './components/sobre/sobre.component';
 import { IndicadoresComponent } from './components/indicadores/indicadores.component';
 import { NgApexchartsModule } from 'ng-apexcharts';
+import { FirstLoginComponent } from './components/admin/first-login/first-login.component';
 
 @NgModule({
   declarations: [
@@ -40,6 +41,7 @@ import { NgApexchartsModule } from 'ng-apexcharts';
     ConsultaEmpresasComponent,
     SobreComponent,
     IndicadoresComponent,
+    FirstLoginComponent,
   ],
   imports: [
     BrowserModule,
