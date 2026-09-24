@@ -20,15 +20,14 @@
           <i class="fa-solid fa-key"></i>
         </span>
 
-        <small>Segurança</small>
+        <small>Primeiro acesso</small>
 
         <h1>
-          Redefinir senha
+          Ative sua conta
         </h1>
 
         <p>
-          Informe os dados solicitados para cadastrar
-          sua nova senha.
+          Informe seus dados para acessar o sistema ForneCE.
         </p>
 
       </div>
@@ -98,7 +97,7 @@
         <div class="form-group field-spacing">
 
           <label for="novaSenha">
-            Nova senha
+            Crie sua senha
           </label>
 
           <div class="input-wrapper">
@@ -110,7 +109,7 @@
               [type]="mostrarSenha ? 'text' : 'password'"
               name="novaSenha"
               [(ngModel)]="loginUsers.user_password"
-              placeholder="Digite sua senha"
+              placeholder="Digite a senha que deseja usar"
               required
             >
 
@@ -138,7 +137,7 @@
           [disabled]="loginForm.invalid"
         >
 
-          Primeiro Login
+          Concluir primeiro acesso
 
           <i class="fa-solid fa-check"></i>
 

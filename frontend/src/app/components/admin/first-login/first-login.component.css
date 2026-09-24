@@ -18,12 +18,12 @@
   background:
     radial-gradient(
       circle at top right,
-      rgba(255, 101, 0, 0.10),
+      rgba(23, 133, 107, 0.14),
       transparent 30%
     ),
     radial-gradient(
       circle at bottom left,
-      rgba(7, 87, 107, 0.12),
+      rgba(255, 101, 0, 0.10),
       transparent 35%
     ),
     #f5f7f8;
@@ -36,6 +36,7 @@
   overflow: hidden;
 
   border-radius: 26px;
+  border-top: 5px solid #17856b;
 
   background: #ffffff;
 
@@ -81,15 +82,15 @@
 
   margin: 0 auto 18px;
 
-  border-radius: 18px;
+  border-radius: 50%;
 
   display: flex;
   align-items: center;
   justify-content: center;
 
-  background: #fff0e5;
+  background: #e8f7f2;
 
-  color: #ff6500;
+  color: #17856b;
 
   font-size: 1.45rem;
 }
@@ -97,7 +98,7 @@
 .reset-header small {
   display: block;
 
-  color: #07576b;
+  color: #17856b;
 
   font-size: 0.75rem;
   font-weight: 800;
@@ -164,10 +165,10 @@
 }
 
 .input-wrapper:focus-within {
-  border-color: #07576b;
+  border-color: #17856b;
 
   box-shadow:
-    0 0 0 4px rgba(7, 87, 107, 0.08);
+    0 0 0 4px rgba(23, 133, 107, 0.10);
 }
 
 .input-wrapper > i {
@@ -207,6 +208,12 @@
   cursor: pointer;
 }
 
+.password-toggle:focus-visible {
+  outline: 2px solid #17856b;
+  outline-offset: -5px;
+  border-radius: 8px;
+}
+
 .field-help {
   display: block;
 
@@ -237,8 +244,8 @@
   background:
     linear-gradient(
       135deg,
-      #07576b,
-      #043f4e
+      #17856b,
+      #07576b
     );
 
   color: #fff;
@@ -254,7 +261,7 @@
   transform: translateY(-1px);
 
   box-shadow:
-    0 10px 25px rgba(7, 87, 107, 0.25);
+    0 10px 25px rgba(23, 133, 107, 0.25);
 }
 
 .btn-primary:disabled {
@@ -270,7 +277,7 @@
 }
 
 .reset-footer a {
-  color: #07576b;
+  color: #17856b;
 
   text-decoration: none;
 
@@ -292,7 +299,7 @@
   }
 
   .reset-content {
-    padding: 38px 35px;
+    padding: 36px 35px 40px;
   }
 
 }
@@ -314,6 +321,7 @@
     max-width: none;
 
     border-radius: 0;
+    border-top-width: 4px;
 
     box-shadow: none;
   }
@@ -332,8 +340,24 @@
     padding: 34px 22px 45px;
   }
 
+  .reset-header {
+    margin-bottom: 30px;
+  }
+
   .reset-header h1 {
     font-size: 1.6rem;
+  }
+
+  .reset-header p {
+    font-size: 0.92rem;
+  }
+
+  .field-spacing {
+    margin-top: 19px;
+  }
+
+  .btn-primary {
+    margin-top: 26px;
   }
 
 }
