@@ -569,6 +569,7 @@ CREATE TABLE IF NOT EXISTS public.junta_empresas (
     -- ---------------------------------------------------------
 
     competencia VARCHAR(7) NOT NULL,
+    ocorrencia_arquivo BIGINT,
     carga_id BIGINT
         REFERENCES public.cargas(id),
     created_at TIMESTAMP NOT NULL
@@ -582,8 +583,7 @@ CREATE TABLE IF NOT EXISTS public.junta_empresas (
     -- O mesmo CNPJ pode existir em competências diferentes,
     -- permitindo manter o histórico mensal.
     -- ---------------------------------------------------------
-
-    CONSTRAINT uk_junta_empresa_competencia
+    
         UNIQUE (
             cnpj,
             competencia

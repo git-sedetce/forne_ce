@@ -369,3 +369,15 @@ CREATE INDEX IF NOT EXISTS idx_junta_empresa_cnaes_carga
 ON public.junta_empresa_cnaes (
     carga_id
 );
+
+CREATE INDEX IF NOT EXISTS idx_junta_empresas_cnpj_competencia
+ON public.junta_empresas (
+    cnpj,
+    competencia
+);
+
+CREATE INDEX IF NOT EXISTS idx_junta_empresas_competencia_ocorrencia
+ON public.junta_empresas (
+    competencia,
+    ocorrencia_arquivo
+);

@@ -334,8 +334,11 @@ def analisar_staging(conn):
     Distingue:
     - registros sem CNPJ;
     - registros com CNPJ estruturalmente inválido;
+    - CNPJ 00000000000000;
     - datas com formato inválido;
-    - CNPJs duplicados no CSV.
+    - CNPJs com múltiplas ocorrências;
+    - ocorrências adicionais;
+    - duplicatas técnicas exatas.
 
     Não altera os dados.
     """
@@ -343,44 +346,51 @@ def analisar_staging(conn):
     with conn.cursor() as cur:
 
         # ----------------------------------------------------
-        # TOTAL
-        # ----------------------------------------------------
-
-        cur.execute(
-            """
-            SELECT COUNT(*)
-            FROM staging.junta_empresas
-            """
-        )
-
-        total = cur.fetchone()[0]
-
-        # ----------------------------------------------------
-        # CNPJ
+        # TOTAL / CNPJ
         # ----------------------------------------------------
 
         cur.execute(
             """
             SELECT
+                COUNT(*) AS total,
 
                 COUNT(*) FILTER (
-                WHERE NULLIF(TRIM(cnpj), '') IS NOT NULL
-                    AND (
-                    length(
-                        regexp_replace(cnpj,'[^0-9]','','g')
-                        ) <> 14
-                    OR regexp_replace(cnpj,'[^0-9]','','g') = '00000000000000'
-                        )
-                    ) AS cnpj_invalido
+                    WHERE NULLIF(TRIM(cnpj), '') IS NULL
+                ) AS sem_cnpj,
+
+                COUNT(*) FILTER (
+                    WHERE NULLIF(TRIM(cnpj), '') IS NOT NULL
+                      AND (
+                            length(
+                                regexp_replace(
+                                    cnpj,
+                                    '[^0-9]',
+                                    '',
+                                    'g'
+                                )
+                            ) <> 14
+
+                            OR regexp_replace(
+                                cnpj,
+                                '[^0-9]',
+                                '',
+                                'g'
+                            ) = '00000000000000'
+                      )
+                ) AS cnpj_invalido
 
             FROM staging.junta_empresas
             """
         )
 
-        sem_cnpj, cnpj_invalido = cur.fetchone()
+        (
+            total,
+            sem_cnpj,
+            cnpj_invalido,
+        ) = cur.fetchone()
 
         # ----------------------------------------------------
-        # DATAS
+        # DATAS COM FORMATO INVÁLIDO
         # ----------------------------------------------------
 
         cur.execute(
@@ -405,17 +415,12 @@ def analisar_staging(conn):
         datas_formato_invalido = cur.fetchone()[0]
 
         # ----------------------------------------------------
-        # DUPLICIDADE DE CNPJ NO CSV
+        # CNPJS COM MÚLTIPLAS OCORRÊNCIAS
         # ----------------------------------------------------
 
         cur.execute(
             """
-            SELECT
-                COALESCE(
-                    SUM(quantidade - 1),
-                    0
-                )
-            FROM (
+            WITH grupos AS (
                 SELECT
                     regexp_replace(
                         cnpj,
@@ -428,40 +433,142 @@ def analisar_staging(conn):
 
                 FROM staging.junta_empresas
 
-                WHERE
-                    NULLIF(TRIM(cnpj), '') IS NOT NULL
+                WHERE NULLIF(TRIM(cnpj), '') IS NOT NULL
 
-                    AND length(
+                  AND length(
                         regexp_replace(
                             cnpj,
                             '[^0-9]',
                             '',
                             'g'
                         )
-                    ) = 14
+                  ) = 14
 
-                    AND regexp_replace(
+                  AND regexp_replace(
                         cnpj,
                         '[^0-9]',
                         '',
                         'g'
-                    ) <> '00000000000000'
+                  ) <> '00000000000000'
 
-                GROUP BY
+                GROUP BY 1
+
+                HAVING COUNT(*) > 1
+            )
+
+            SELECT
+                COUNT(*) AS cnpjs_multiplas_ocorrencias,
+                COALESCE(
+                    SUM(quantidade - 1),
+                    0
+                ) AS ocorrencias_adicionais
+
+            FROM grupos
+            """
+        )
+
+        (
+            cnpjs_multiplas_ocorrencias,
+            ocorrencias_adicionais,
+        ) = cur.fetchone()
+
+        # ----------------------------------------------------
+        # DUPLICATAS TÉCNICAS EXATAS
+        # ----------------------------------------------------
+
+        cur.execute(
+            """
+            WITH base AS (
+                SELECT
                     regexp_replace(
                         cnpj,
                         '[^0-9]',
                         '',
                         'g'
+                    ) AS cnpj,
+
+                    NULLIF(TRIM(cnaes), '') AS cnaes,
+                    NULLIF(TRIM(razao_social), '') AS razao_social,
+                    NULLIF(TRIM(nome_fantasia), '') AS nome_fantasia,
+                    NULLIF(TRIM(status), '') AS status,
+                    NULLIF(TRIM(porte), '') AS porte,
+                    NULLIF(TRIM(municipio), '') AS municipio,
+                    NULLIF(TRIM(regiao), '') AS regiao,
+                    NULLIF(TRIM(nu_dddtelefone), '') AS ddd,
+                    NULLIF(TRIM(nu_telefone), '') AS telefone,
+                    NULLIF(TRIM(email), '') AS email,
+                    NULLIF(TRIM(tipo_logradouro), '') AS tipo_logradouro,
+                    NULLIF(TRIM(nome_logradouro), '') AS logradouro,
+                    NULLIF(TRIM(num_logradouro), '') AS numero,
+                    NULLIF(TRIM(bairro), '') AS bairro,
+                    NULLIF(
+                        TRIM(cd_opcao_simples_nacional),
+                        ''
+                    ) AS simples,
+                    NULLIF(TRIM(data_abertura), '') AS data_abertura,
+                    NULLIF(
+                        TRIM(data_encerramento),
+                        ''
+                    ) AS data_encerramento
+
+                FROM staging.junta_empresas
+
+                WHERE length(
+                    regexp_replace(
+                        COALESCE(cnpj, ''),
+                        '[^0-9]',
+                        '',
+                        'g'
                     )
+                ) = 14
+
+                AND regexp_replace(
+                    cnpj,
+                    '[^0-9]',
+                    '',
+                    'g'
+                ) <> '00000000000000'
+            ),
+
+            repetidos AS (
+                SELECT
+                    COUNT(*) AS quantidade
+
+                FROM base
+
+                GROUP BY
+                    cnpj,
+                    cnaes,
+                    razao_social,
+                    nome_fantasia,
+                    status,
+                    porte,
+                    municipio,
+                    regiao,
+                    ddd,
+                    telefone,
+                    email,
+                    tipo_logradouro,
+                    logradouro,
+                    numero,
+                    bairro,
+                    simples,
+                    data_abertura,
+                    data_encerramento
 
                 HAVING COUNT(*) > 1
+            )
 
-            ) duplicados
+            SELECT
+                COALESCE(
+                    SUM(quantidade - 1),
+                    0
+                )
+            FROM repetidos
             """
         )
 
-        duplicados_csv = int(
+        duplicatas_exatas = int(
             cur.fetchone()[0]
         )
 
@@ -469,10 +576,12 @@ def analisar_staging(conn):
         "total": total,
         "sem_cnpj": sem_cnpj,
         "cnpj_invalido": cnpj_invalido,
-        "datas_formato_invalido": (
-            datas_formato_invalido
+        "datas_formato_invalido": datas_formato_invalido,
+        "cnpjs_multiplas_ocorrencias": (
+            cnpjs_multiplas_ocorrencias
         ),
-        "duplicados_csv": duplicados_csv,
+        "ocorrencias_adicionais": ocorrencias_adicionais,
+        "duplicatas_exatas": duplicatas_exatas,
     }
 
 
@@ -482,11 +591,17 @@ def analisar_staging(conn):
 
 def preparar_dados_validos(conn):
     """
-    Cria uma tabela temporária contendo os registros
-    normalizados e estruturalmente válidos.
+    Cria tabela temporária com as ocorrências válidas da Junta.
 
-    DISTINCT ON garante apenas um registro por CNPJ
-    dentro do arquivo atual.
+    Regras:
+    - remove CNPJ vazio;
+    - remove CNPJ estruturalmente inválido;
+    - remove CNPJ 00000000000000;
+    - preserva múltiplas ocorrências do mesmo CNPJ;
+    - remove apenas duplicatas técnicas 100% idênticas.
+
+    ocorrencia_id é uma chave técnica usada somente durante
+    esta execução para relacionar a ocorrência aos seus CNAEs.
     """
 
     with conn.cursor() as cur:
@@ -503,181 +618,262 @@ def preparar_dados_validos(conn):
             ON COMMIT PRESERVE ROWS
             AS
 
-            SELECT DISTINCT ON (cnpj_normalizado)
-
-                cnpj_normalizado AS cnpj,
-
-                NULLIF(
-                    TRIM(razao_social),
-                    ''
-                ) AS razao_social,
-
-                NULLIF(
-                    TRIM(nome_fantasia),
-                    ''
-                ) AS nome_fantasia,
-
-                UPPER(
-                    NULLIF(
-                        TRIM(status),
-                        ''
-                    )
-                ) AS status,
-
-                UPPER(
-                    NULLIF(
-                        TRIM(porte),
-                        ''
-                    )
-                ) AS porte,
-
-                NULLIF(
-                    TRIM(municipio),
-                    ''
-                ) AS municipio,
-
-                NULLIF(
-                    TRIM(regiao),
-                    ''
-                ) AS regiao,
-
-                CASE
-                    WHEN length(
-                        regexp_replace(
-                            COALESCE(nu_dddtelefone, ''),
-                            '[^0-9]',
-                            '',
-                            'g'
-                        )
-                    ) = 2
-                    THEN regexp_replace(
-                        nu_dddtelefone,
-                        '[^0-9]',
-                        '',
-                        'g'
-                    )
-                    ELSE NULL
-                END AS ddd_telefone,
-
-                NULLIF(
-                    regexp_replace(
-                        COALESCE(nu_telefone, ''),
-                        '[^0-9]',
-                        '',
-                        'g'
-                    ),
-                    ''
-                ) AS telefone,
-
-                NULLIF(
-                    TRIM(email),
-                    ''
-                ) AS email,
-
-                NULLIF(
-                    TRIM(tipo_logradouro),
-                    ''
-                ) AS tipo_logradouro,
-
-                NULLIF(
-                    TRIM(nome_logradouro),
-                    ''
-                ) AS logradouro,
-
-                NULLIF(
-                    TRIM(num_logradouro),
-                    ''
-                ) AS numero,
-
-                NULLIF(
-                    TRIM(bairro),
-                    ''
-                ) AS bairro,
-
-                CASE
-                    WHEN UPPER(
-                        TRIM(
-                            COALESCE(
-                                cd_opcao_simples_nacional,
-                                ''
-                            )
-                        )
-                    ) IN ('S', 'N')
-                    THEN UPPER(
-                        TRIM(
-                            cd_opcao_simples_nacional
-                        )
-                    )
-                    ELSE NULL
-                END AS opcao_simples_nacional,
-
-                CASE
-                    WHEN NULLIF(
-                        TRIM(data_abertura),
-                        ''
-                    ) IS NULL
-                    THEN NULL
-
-                    WHEN TRIM(data_abertura)
-                        ~ '^\\d{2}-\\d{2}-\\d{4}'
-                    THEN TO_DATE(
-                        SUBSTRING(
-                            TRIM(data_abertura)
-                            FROM 1 FOR 10
-                        ),
-                        'DD-MM-YYYY'
-                    )
-
-                    ELSE NULL
-                END AS data_abertura,
-
-                CASE
-                    WHEN NULLIF(
-                        TRIM(data_encerramento),
-                        ''
-                    ) IS NULL
-                    THEN NULL
-
-                    WHEN TRIM(data_encerramento)
-                        ~ '^\\d{2}-\\d{2}-\\d{4}'
-                    THEN TO_DATE(
-                        SUBSTRING(
-                            TRIM(data_encerramento)
-                            FROM 1 FOR 10
-                        ),
-                        'DD-MM-YYYY'
-                    )
-
-                    ELSE NULL
-                END AS data_encerramento,
-
-                cnaes
-
-            FROM (
+            WITH origem AS (
 
                 SELECT
-                    *,
                     regexp_replace(
                         COALESCE(cnpj, ''),
                         '[^0-9]',
                         '',
                         'g'
-                    ) AS cnpj_normalizado
+                    ) AS cnpj_normalizado,
+
+                    cnaes,
+                    razao_social,
+                    nome_fantasia,
+                    status,
+                    porte,
+                    municipio,
+                    regiao,
+                    nu_dddtelefone,
+                    nu_telefone,
+                    email,
+                    tipo_logradouro,
+                    nome_logradouro,
+                    num_logradouro,
+                    bairro,
+                    cd_opcao_simples_nacional,
+                    data_abertura,
+                    data_encerramento
 
                 FROM staging.junta_empresas
+            ),
 
-            ) origem
+            validos AS (
 
-            WHERE length(cnpj_normalizado) = 14 AND cnpj_normalizado <> '00000000000000'WHERE length(cnpj_normalizado) = 14
+                SELECT *
 
-            ORDER BY
-                cnpj_normalizado
+                FROM origem
+
+                WHERE length(cnpj_normalizado) = 14
+                  AND cnpj_normalizado <> '00000000000000'
+            ),
+
+            sem_duplicata_exata AS (
+
+                SELECT
+                    *,
+
+                    ROW_NUMBER() OVER (
+                        PARTITION BY
+                            cnpj_normalizado,
+                            COALESCE(cnaes, ''),
+                            COALESCE(razao_social, ''),
+                            COALESCE(nome_fantasia, ''),
+                            COALESCE(status, ''),
+                            COALESCE(porte, ''),
+                            COALESCE(municipio, ''),
+                            COALESCE(regiao, ''),
+                            COALESCE(nu_dddtelefone, ''),
+                            COALESCE(nu_telefone, ''),
+                            COALESCE(email, ''),
+                            COALESCE(tipo_logradouro, ''),
+                            COALESCE(nome_logradouro, ''),
+                            COALESCE(num_logradouro, ''),
+                            COALESCE(bairro, ''),
+                            COALESCE(
+                                cd_opcao_simples_nacional,
+                                ''
+                            ),
+                            COALESCE(data_abertura, ''),
+                            COALESCE(data_encerramento, '')
+
+                        ORDER BY cnpj_normalizado
+                    ) AS rn
+
+                FROM validos
+            ),
+
+            normalizados AS (
+
+                SELECT
+                    cnpj_normalizado AS cnpj,
+
+                    NULLIF(
+                        TRIM(razao_social),
+                        ''
+                    ) AS razao_social,
+
+                    NULLIF(
+                        TRIM(nome_fantasia),
+                        ''
+                    ) AS nome_fantasia,
+
+                    UPPER(
+                        NULLIF(
+                            TRIM(status),
+                            ''
+                        )
+                    ) AS status,
+
+                    UPPER(
+                        NULLIF(
+                            TRIM(porte),
+                            ''
+                        )
+                    ) AS porte,
+
+                    NULLIF(
+                        TRIM(municipio),
+                        ''
+                    ) AS municipio,
+
+                    NULLIF(
+                        TRIM(regiao),
+                        ''
+                    ) AS regiao,
+
+                    CASE
+                        WHEN length(
+                            regexp_replace(
+                                COALESCE(
+                                    nu_dddtelefone,
+                                    ''
+                                ),
+                                '[^0-9]',
+                                '',
+                                'g'
+                            )
+                        ) = 2
+                        THEN regexp_replace(
+                            nu_dddtelefone,
+                            '[^0-9]',
+                            '',
+                            'g'
+                        )
+                        ELSE NULL
+                    END AS ddd_telefone,
+
+                    NULLIF(
+                        regexp_replace(
+                            COALESCE(
+                                nu_telefone,
+                                ''
+                            ),
+                            '[^0-9]',
+                            '',
+                            'g'
+                        ),
+                        ''
+                    ) AS telefone,
+
+                    NULLIF(
+                        TRIM(email),
+                        ''
+                    ) AS email,
+
+                    NULLIF(
+                        TRIM(tipo_logradouro),
+                        ''
+                    ) AS tipo_logradouro,
+
+                    NULLIF(
+                        TRIM(nome_logradouro),
+                        ''
+                    ) AS logradouro,
+
+                    NULLIF(
+                        TRIM(num_logradouro),
+                        ''
+                    ) AS numero,
+
+                    NULLIF(
+                        TRIM(bairro),
+                        ''
+                    ) AS bairro,
+
+                    CASE
+                        WHEN UPPER(
+                            TRIM(
+                                COALESCE(
+                                    cd_opcao_simples_nacional,
+                                    ''
+                                )
+                            )
+                        ) IN ('S', 'N')
+                        THEN UPPER(
+                            TRIM(
+                                cd_opcao_simples_nacional
+                            )
+                        )
+                        ELSE NULL
+                    END AS opcao_simples_nacional,
+
+                    CASE
+                        WHEN NULLIF(
+                            TRIM(data_abertura),
+                            ''
+                        ) IS NULL
+                        THEN NULL
+
+                        WHEN TRIM(data_abertura)
+                            ~ '^\\d{2}-\\d{2}-\\d{4}'
+                        THEN TO_DATE(
+                            SUBSTRING(
+                                TRIM(data_abertura)
+                                FROM 1 FOR 10
+                            ),
+                            'DD-MM-YYYY'
+                        )
+
+                        ELSE NULL
+                    END AS data_abertura,
+
+                    CASE
+                        WHEN NULLIF(
+                            TRIM(data_encerramento),
+                            ''
+                        ) IS NULL
+                        THEN NULL
+
+                        WHEN TRIM(data_encerramento)
+                            ~ '^\\d{2}-\\d{2}-\\d{4}'
+                        THEN TO_DATE(
+                            SUBSTRING(
+                                TRIM(data_encerramento)
+                                FROM 1 FOR 10
+                            ),
+                            'DD-MM-YYYY'
+                        )
+
+                        ELSE NULL
+                    END AS data_encerramento,
+
+                    cnaes
+
+                FROM sem_duplicata_exata
+
+                WHERE rn = 1
+            )
+
+            SELECT
+                ROW_NUMBER() OVER ()::BIGINT
+                    AS ocorrencia_id,
+
+                normalizados.*
+
+            FROM normalizados
             """
         )
 
-        # ----------------------------------------------------
-        # QUANTIDADE DE REGISTROS VÁLIDOS
-        # ----------------------------------------------------
+        cur.execute(
+            """
+            CREATE UNIQUE INDEX
+            ON tmp_junta_empresas_validas (
+                ocorrencia_id
+            )
+            """
+        )
 
         cur.execute(
             """
@@ -830,11 +1026,7 @@ def promover_empresas(
     carga_id,
 ):
     """
-    Insere empresas válidas que ainda não existem
-    para a competência atual.
-
-    Retorna:
-        quantidade inserida
+    Insere em massa todas as ocorrências válidas da Junta.
     """
 
     with conn.cursor() as cur:
@@ -842,7 +1034,6 @@ def promover_empresas(
         cur.execute(
             """
             INSERT INTO public.junta_empresas (
-
                 cnpj,
                 razao_social,
                 nome_fantasia,
@@ -861,12 +1052,11 @@ def promover_empresas(
                 data_abertura,
                 data_encerramento,
                 competencia,
-                carga_id
-
+                carga_id,
+                ocorrencia_arquivo
             )
 
             SELECT
-
                 origem.cnpj,
                 origem.razao_social,
                 origem.nome_fantasia,
@@ -885,16 +1075,10 @@ def promover_empresas(
                 origem.data_abertura,
                 origem.data_encerramento,
                 %s,
-                %s
+                %s,
+                origem.ocorrencia_id
 
             FROM tmp_junta_empresas_validas origem
-
-            ON CONFLICT (
-                cnpj,
-                competencia
-            )
-
-            DO NOTHING
             """,
             (
                 COMPETENCIA_JUNTA,
@@ -912,10 +1096,12 @@ def promover_cnaes(
     carga_id,
 ):
     """
-    Separa a lista de CNAEs usando PostgreSQL.
+    Relaciona os CNAEs à ocorrência exata da Junta.
 
-    ordem representa somente a posição do código no CSV.
-    NÃO significa CNAE principal.
+    ordem representa somente a posição do CNAE
+    na lista recebida no CSV.
+
+    Não significa CNAE principal.
     """
 
     with conn.cursor() as cur:
@@ -929,9 +1115,7 @@ def promover_cnaes(
             WITH cnaes_separados AS (
 
                 SELECT DISTINCT
-
-                    empresa.cnpj,
-
+                    empresa.ocorrencia_id,
                     TRIM(item.codigo)
                         AS cnae_codigo
 
@@ -947,8 +1131,11 @@ def promover_cnaes(
                     ) AS item(codigo)
 
                 WHERE
-                    TRIM(item.codigo) ~ '^[0-9]{7}$'
-                    AND TRIM(item.codigo) <> '0000000'
+                    TRIM(item.codigo)
+                        ~ '^[0-9]{7}$'
+
+                    AND TRIM(item.codigo)
+                        <> '0000000'
             )
 
             SELECT COUNT(*)
@@ -966,7 +1153,7 @@ def promover_cnaes(
         desconhecidos = cur.fetchone()[0]
 
         # ----------------------------------------------------
-        # INSERT
+        # INSERT DOS CNAES
         # ----------------------------------------------------
 
         cur.execute(
@@ -974,8 +1161,7 @@ def promover_cnaes(
             WITH cnaes_separados AS (
 
                 SELECT
-
-                    empresa.cnpj,
+                    empresa.ocorrencia_id,
 
                     TRIM(item.codigo)
                         AS cnae_codigo,
@@ -993,6 +1179,7 @@ def promover_cnaes(
                         ),
                         ','
                     )
+
                     WITH ORDINALITY
                     AS item(
                         codigo,
@@ -1000,40 +1187,40 @@ def promover_cnaes(
                     )
 
                 WHERE
-                    TRIM(item.codigo) ~ '^[0-9]{7}$'
-                    AND TRIM(item.codigo) <> '0000000'
+                    TRIM(item.codigo)
+                        ~ '^[0-9]{7}$'
+
+                    AND TRIM(item.codigo)
+                        <> '0000000'
             ),
 
             cnaes_sem_duplicidade AS (
 
                 SELECT DISTINCT ON (
-                    cnpj,
+                    ocorrencia_id,
                     cnae_codigo
                 )
 
-                    cnpj,
+                    ocorrencia_id,
                     cnae_codigo,
                     ordem
 
                 FROM cnaes_separados
 
                 ORDER BY
-                    cnpj,
+                    ocorrencia_id,
                     cnae_codigo,
                     ordem
             )
 
             INSERT INTO public.junta_empresa_cnaes (
-
                 junta_empresa_id,
                 cnae_codigo,
                 ordem,
                 carga_id
-
             )
 
             SELECT
-
                 empresa.id,
                 origem.cnae_codigo,
                 origem.ordem,
@@ -1042,8 +1229,9 @@ def promover_cnaes(
             FROM cnaes_sem_duplicidade origem
 
             INNER JOIN public.junta_empresas empresa
-                ON empresa.cnpj = origem.cnpj
-               AND empresa.competencia = %s
+                ON empresa.competencia = %s
+               AND empresa.ocorrencia_arquivo
+                    = origem.ocorrencia_id
 
             INNER JOIN public.cnaes dominio
                 ON dominio.codigo
@@ -1053,7 +1241,6 @@ def promover_cnaes(
                 junta_empresa_id,
                 cnae_codigo
             )
-
             DO NOTHING
             """,
             (
@@ -1112,8 +1299,18 @@ def processar_staging(
     )
 
     print(
-        f"Duplicados no CSV:        "
-        f"{estatisticas['duplicados_csv']:,}"
+    f"CNPJs com múltiplas ocorrências: "
+    f"{estatisticas['cnpjs_multiplas_ocorrencias']:,}"
+    )
+
+    print(
+    f"Ocorrências adicionais:          "
+    f"{estatisticas['ocorrencias_adicionais']:,}"
+    )
+
+    print(
+    f"Duplicatas técnicas exatas:      "
+    f"{estatisticas['duplicatas_exatas']:,}"
     )
 
     # --------------------------------------------------------
@@ -1126,8 +1323,8 @@ def processar_staging(
     validos = preparar_dados_validos(conn)
 
     print(
-        f"Empresas válidas:         "
-        f"{validos:,}"
+    f"Ocorrências válidas:      "
+    f"{validos:,}"
     )
 
     # --------------------------------------------------------
@@ -1175,7 +1372,7 @@ def processar_staging(
             )
 
             print(
-                f"Empresas removidas:       "
+                f"Ocorrências removidas:       "
                 f"{removidos['empresas']:,}"
             )
 
@@ -1222,11 +1419,7 @@ def processar_staging(
 
     totais["inseridos"] = inseridos
 
-    totais["duplicados"] = (
-        validos
-        - inseridos
-        + estatisticas["duplicados_csv"]
-    )
+    totais["duplicados"] = (estatisticas["duplicatas_exatas"])
 
     totais["erros"] += (
         estatisticas["sem_cnpj"]
@@ -1265,12 +1458,12 @@ def processar_staging(
     print("-" * 70)
 
     print(
-        f"Empresas processadas:    "
+        f"Ocorrências processadas:    "
         f"{totais['processados']:,}"
     )
 
     print(
-        f"Empresas inseridas:      "
+        f"Ocorrências inseridas:      "
         f"{totais['inseridos']:,}"
     )
 
@@ -1460,6 +1653,11 @@ def main():
             )
         )
 
+        substituir_competencia = (
+            args.reprocessar
+            and registros_existentes > 0
+        )
+
         if registros_existentes > 0:
             if not args.reprocessar:
 
@@ -1582,7 +1780,7 @@ def main():
             conn=conn,
             carga_id=carga_id,
             totais=totais,
-            reprocessar=args.reprocessar,
+            reprocessar=substituir_competencia,
         )
 
         # ----------------------------------------------------
@@ -1615,6 +1813,11 @@ def main():
         tempo = (
             time.time()
             - inicio
+        )
+
+        print(
+            f"Modo:        "
+            f"{'REPROCESSAMENTO' if substituir_competencia else 'CARGA NORMAL'}"
         )
 
         print()
