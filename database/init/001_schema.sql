@@ -576,18 +576,6 @@ CREATE TABLE IF NOT EXISTS public.junta_empresas (
         DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL
         DEFAULT CURRENT_TIMESTAMP,
-
-    -- ---------------------------------------------------------
-    -- UNICIDADE
-    --
-    -- O mesmo CNPJ pode existir em competências diferentes,
-    -- permitindo manter o histórico mensal.
-    -- ---------------------------------------------------------
-    
-        UNIQUE (
-            cnpj,
-            competencia
-        )
 );
 
 -- =====================================================================
