@@ -575,7 +575,7 @@ CREATE TABLE IF NOT EXISTS public.junta_empresas (
     created_at TIMESTAMP NOT NULL
         DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL
-        DEFAULT CURRENT_TIMESTAMP,
+        DEFAULT CURRENT_TIMESTAMP
 );
 
 -- =====================================================================
