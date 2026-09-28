@@ -123,6 +123,8 @@ export class EmpresaService {
 
     filtros: {
       cnae?: string;
+      cnaes?: string[];
+      nome?: string;
       regiao?: string;
       municipio?: string;
       porte?: string;
@@ -134,6 +136,14 @@ export class EmpresaService {
 
     if (filtros.cnae?.trim()) {
       params = params.set('cnae', filtros.cnae.trim());
+    }
+
+    if (filtros.cnaes?.length) {
+      params = params.set('cnaes', filtros.cnaes.join('|'));
+    }
+
+    if (filtros.nome?.trim()) {
+      params = params.set('nome', filtros.nome.trim());
     }
 
     if (filtros.regiao?.trim()) {

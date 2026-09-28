@@ -2246,7 +2246,17 @@ class EmpresaControllers {
       // FILTROS
       // =====================================================
 
-      const cnae = String(req.query.cnae || "").replace(/\D/g, "");
+      const cnaesInformados = req.query.cnaes ?? req.query.cnae ?? "";
+
+      const cnaes = [
+        ...(Array.isArray(cnaesInformados)
+          ? cnaesInformados
+          : String(cnaesInformados).split("|")),
+      ]
+        .map((item) => String(item).replace(/\D/g, ""))
+        .filter(Boolean);
+
+      const nome = String(req.query.nome || "").trim();
 
       const municipio = String(req.query.municipio || "").trim();
 
@@ -2287,9 +2297,9 @@ class EmpresaControllers {
       // VALIDAÇÕES
       // =====================================================
 
-      if (cnae && cnae.length !== 7) {
+      if (cnaes.some((cnae) => cnae.length !== 7)) {
         return res.status(400).json({
-          message: "O CNAE deve conter exatamente sete números.",
+          message: "Cada CNAE deve conter exatamente sete números.",
         });
       }
 
@@ -2313,7 +2323,7 @@ class EmpresaControllers {
        * Evita consulta irrestrita de todas as ocorrências
        * ativas da JUCEC.
        */
-      if (!cnae && !municipio && !regiao && !porte) {
+      if (!cnaes.length && !nome && !municipio && !regiao && !porte) {
         return res.status(400).json({
           message: "Informe pelo menos um filtro para realizar a pesquisa.",
         });
@@ -2379,7 +2389,7 @@ class EmpresaControllers {
        * EXISTS evita multiplicar a ocorrência caso ela
        * possua vários CNAEs.
        */
-      if (cnae) {
+      if (cnaes.length) {
         where.push(`
         EXISTS (
           SELECT 1
@@ -2387,11 +2397,26 @@ class EmpresaControllers {
           FROM public.junta_empresa_cnaes jec
 
           WHERE jec.junta_empresa_id = je.id
-            AND jec.cnae_codigo = :cnae
+            AND jec.cnae_codigo IN (:cnaes)
         )
       `);
 
-        replacements.cnae = cnae;
+        replacements.cnaes = [...new Set(cnaes)];
+      }
+
+      // -----------------------------------------------------
+      // NOME DA EMPRESA
+      // -----------------------------------------------------
+
+      if (nome) {
+        where.push(`
+        (
+          je.razao_social ILIKE :nomePesquisa
+          OR je.nome_fantasia ILIKE :nomePesquisa
+        )
+      `);
+
+        replacements.nomePesquisa = `%${nome}%`;
       }
 
       // -----------------------------------------------------
@@ -2611,9 +2636,15 @@ class EmpresaControllers {
         fonte: "JUCEC",
 
         filtros: {
-          cnae: cnae || null,
+          cnae: cnaes.length === 1 ? cnaes[0] : null,
 
-          cnae_formatado: cnae ? EmpresaControllers.formatarCnae(cnae) : null,
+          cnae_formatado:
+            cnaes.length === 1
+              ? EmpresaControllers.formatarCnae(cnaes[0])
+              : null,
+
+          cnaes,
+          nome: nome || null,
 
           regiao: regiao || null,
           municipio: municipio || null,
@@ -2627,7 +2658,9 @@ class EmpresaControllers {
            * Diferentemente da Receita, não afirmamos
            * que o CNAE encontrado é principal.
            */
-          criterio_cnae: cnae ? "qualquer_cnae_informado_pela_jucec" : null,
+          criterio_cnae: cnaes.length
+            ? "qualquer_cnae_informado_pela_jucec"
+            : null,
         },
 
         paginacao: {

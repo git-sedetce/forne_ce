@@ -66,13 +66,13 @@
         <div class="filter-field atividade-field">
 
           <label for="atividade">
-            Atividade econômica
+            Atividades econômicas (CNAE)
           </label>
 
           <div class="input-wrapper">
             <i class="fa-solid fa-briefcase"></i>
             <input id="atividade" type="text" [(ngModel)]="atividadePesquisa" (input)="filtrarAtividades()"
-              (focus)="abrirListaAtividades()" placeholder="Ex.: panificação, transporte, construção..."
+              (focus)="abrirListaAtividades()" placeholder="Pesquise e selecione uma ou mais atividades..."
               autocomplete="off">
             <i *ngIf="carregandoAtividades" class="fa-solid fa-spinner fa-spin atividade-loading"></i>
           </div>
@@ -121,13 +121,23 @@
 
 
           <small>
-            Pesquise pela descrição da atividade.
+            Pesquise por descrição ou código e selecione várias atividades.
           </small>
+
+          <div class="activity-tags" *ngIf="cnaesSelecionados.length">
+            <span class="activity-tag" *ngFor="let atividade of cnaesSelecionados">
+              {{ atividade.codigo_formatado }}
+              <button type="button" (click)="removerCnae(atividade.codigo)"
+                [attr.aria-label]="'Remover CNAE ' + atividade.codigo_formatado">
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+            </span>
+          </div>
 
         </div>
 
 
-        <!-- CNAE -->
+        <!-- CNAE DIGITADO -->
         <div class="filter-field">
 
           <label for="cnae">
@@ -136,12 +146,31 @@
 
           <div class="input-wrapper">
             <i class="fa-solid fa-magnifying-glass"></i>
-            <input id="cnae" type="text" [(ngModel)]="cnae" (input)="onCnaeInput()" maxlength="10"
+            <input id="cnae" type="text" [(ngModel)]="cnae" maxlength="10"
               placeholder="Ex.: 1091101">
           </div>
 
           <small>
             Informe os 7 números do CNAE, se souber.
+          </small>
+        </div>
+
+
+        <!-- NOME DA EMPRESA -->
+        <div class="filter-field">
+
+          <label for="nomeEmpresa">
+            Nome da empresa
+          </label>
+
+          <div class="input-wrapper">
+            <i class="fa-solid fa-building"></i>
+            <input id="nomeEmpresa" type="text" [(ngModel)]="nomeEmpresa" maxlength="150"
+              placeholder="Razão social ou nome fantasia">
+          </div>
+
+          <small>
+            Pesquise pelo nome empresarial ou fantasia.
           </small>
         </div>
 
@@ -331,19 +360,36 @@
             Critérios da consulta
           </span>
           <div class="criteria-list">
-            <!-- CNAE -->
-            <div class="criteria-item criteria-item-main" *ngIf="cnae">
+            <!-- CNAES -->
+            <div class="criteria-item criteria-item-main" *ngFor="let atividade of cnaesSelecionados">
               <i class="fa-solid fa-briefcase"></i>
               <div>
                 <span>
                   Atividade econômica
                 </span>
                 <strong>
-                  {{ cnaeFormatado }}
+                  {{ atividade.codigo_formatado }}
                 </strong>
-                <small *ngIf="cnaeDescricao">
-                  {{ cnaeDescricao }}
+                <small>
+                  {{ atividade.descricao }}
                 </small>
+              </div>
+            </div>
+
+            <div class="criteria-item" *ngIf="cnae && !cnaeManualJaSelecionado">
+              <i class="fa-solid fa-briefcase"></i>
+              <div>
+                <span>CNAE</span>
+                <strong>{{ formatarCnae(cnae) }}</strong>
+              </div>
+            </div>
+
+            <!-- NOME DA EMPRESA -->
+            <div class="criteria-item" *ngIf="nomeEmpresa.trim()">
+              <i class="fa-solid fa-building"></i>
+              <div>
+                <span>Empresa</span>
+                <strong>{{ nomeEmpresa.trim() }}</strong>
               </div>
             </div>
 

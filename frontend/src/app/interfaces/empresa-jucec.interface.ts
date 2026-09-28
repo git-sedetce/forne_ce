@@ -46,6 +46,8 @@ export interface EmpresasJucecResponse {
   filtros: {
     cnae: string | null;
     cnae_formatado: string | null;
+    cnaes?: string[];
+    nome?: string | null;
 
     regiao: string | null;
     municipio: string | null;

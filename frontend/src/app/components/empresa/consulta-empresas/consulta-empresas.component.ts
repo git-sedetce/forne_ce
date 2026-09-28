@@ -28,6 +28,8 @@ export class ConsultaEmpresasComponent implements OnInit {
   // =====================================================
 
   cnae = '';
+  cnaesSelecionados: CnaeItem[] = [];
+  nomeEmpresa = '';
   municipio = '';
   uf = 'CE';
 
@@ -48,8 +50,6 @@ export class ConsultaEmpresasComponent implements OnInit {
   totalItens = 0;
   totalPaginas = 0;
 
-  cnaeFormatado = '';
-  cnaeDescricao = '';
   competencia = '';
 
   regiao = '';
@@ -73,8 +73,9 @@ export class ConsultaEmpresasComponent implements OnInit {
     return this.porte ? this.portes[this.porte] || this.porte : '';
   }
 
-  get possuiCnae(): boolean {
-    return !!this.cnae;
+  get cnaeManualJaSelecionado(): boolean {
+    const codigo = this.limparCnae(this.cnae);
+    return this.cnaesSelecionados.some((atividade) => atividade.codigo === codigo);
   }
 
   get possuiFiltrosGeograficos(): boolean {
@@ -89,7 +90,6 @@ export class ConsultaEmpresasComponent implements OnInit {
   atividadesFiltradas: CnaeItem[] = [];
   mostrarAtividades = false;
   carregandoAtividades = false;
-  atividadeSelecionada: CnaeItem | null = null;
 
   // =====================================================
   // REGIÕES DO CEARÁ
@@ -210,20 +210,22 @@ export class ConsultaEmpresasComponent implements OnInit {
   pesquisar(): void {
     this.mensagemErro = '';
 
-    const cnaeLimpo = this.limparCnae(this.cnae);
+    this.cnae = this.limparCnae(this.cnae);
 
-    // CNAE é opcional, mas se informado
-    // precisa conter exatamente 7 dígitos.
-    if (cnaeLimpo && cnaeLimpo.length !== 7) {
+    if (this.cnae && this.cnae.length !== 7) {
       this.mensagemErro = 'O CNAE deve conter 7 números.';
-
       return;
     }
 
-    this.cnae = cnaeLimpo;
-
     // É obrigatório pelo menos um critério.
-    if (!this.cnae && !this.regiao && !this.municipio && !this.porte) {
+    if (
+      !this.cnaesSelecionados.length &&
+      !this.cnae &&
+      !this.nomeEmpresa.trim() &&
+      !this.regiao &&
+      !this.municipio &&
+      !this.porte
+    ) {
       this.mensagemErro =
         'Informe pelo menos um filtro para realizar a pesquisa.';
 
@@ -232,10 +234,6 @@ export class ConsultaEmpresasComponent implements OnInit {
 
     // Nova pesquisa sempre começa na página 1.
     this.pagina = 1;
-
-    // Empresas de uma pesquisa anterior não devem
-    // permanecer selecionadas em uma nova consulta.
-    this.empresasSelecionadas.clear();
 
     // Fecha o autocomplete.
     this.mostrarAtividades = false;
@@ -250,7 +248,8 @@ export class ConsultaEmpresasComponent implements OnInit {
 
     this.empresaService
       .pesquisarEmpresasJucec(this.pagina, this.limite, {
-        cnae: this.cnae || undefined,
+        cnaes: this.obterCnaesConsulta(),
+        nome: this.nomeEmpresa.trim() || undefined,
         regiao: this.regiao || undefined,
         municipio: this.municipio || undefined,
         porte: this.porte || undefined,
@@ -276,33 +275,6 @@ export class ConsultaEmpresasComponent implements OnInit {
 
           this.competencia = response.filtros.competencia;
 
-          // ===============================================
-          // CNAE
-          // ===============================================
-
-          if (response.filtros.cnae) {
-            this.cnae = response.filtros.cnae;
-
-            this.cnaeFormatado = response.filtros.cnae_formatado || this.cnae;
-
-            /*
-             * A descrição normalmente já veio do
-             * autocomplete da Receita.
-             *
-             * Se o usuário digitou o código manualmente,
-             * procuramos esse CNAE na primeira ocorrência.
-             */
-            if (!this.cnaeDescricao && response.dados.length > 0) {
-              const cnaeEncontrado = response.dados[0].cnaes?.find(
-                (item) => item.codigo === this.cnae,
-              );
-
-              this.cnaeDescricao = cnaeEncontrado?.descricao || '';
-            }
-          } else {
-            this.cnaeFormatado = '';
-            this.cnaeDescricao = '';
-          }
         },
 
         error: (error) => {
@@ -389,12 +361,10 @@ export class ConsultaEmpresasComponent implements OnInit {
   }
 
   private limparFiltroCnae(): void {
+    this.cnaesSelecionados = [];
     this.cnae = '';
-    this.cnaeFormatado = '';
-    this.cnaeDescricao = '';
-
+    this.nomeEmpresa = '';
     this.atividadePesquisa = '';
-    this.atividadeSelecionada = null;
 
     this.atividadesFiltradas = [];
     this.mostrarAtividades = false;
@@ -459,21 +429,6 @@ export class ConsultaEmpresasComponent implements OnInit {
   filtrarAtividades(): void {
     const termo = this.atividadePesquisa.trim();
 
-    // Se havia uma atividade selecionada e o usuário
-    // começou a editar o texto, a seleção anterior
-    // deixa de ser válida.
-    if (this.atividadeSelecionada) {
-      const textoSelecionado = `${this.atividadeSelecionada.codigo_formatado} - ${this.atividadeSelecionada.descricao}`;
-
-      if (termo !== textoSelecionado) {
-        this.atividadeSelecionada = null;
-
-        this.cnae = '';
-        this.cnaeFormatado = '';
-        this.cnaeDescricao = '';
-      }
-    }
-
     if (termo.length < 2) {
       this.atividadesFiltradas = [];
       this.mostrarAtividades = false;
@@ -486,34 +441,20 @@ export class ConsultaEmpresasComponent implements OnInit {
   }
 
   selecionarAtividade(atividade: CnaeItem): void {
-    this.atividadeSelecionada = atividade;
-    this.cnae = atividade.codigo;
-    this.cnaeFormatado = atividade.codigo_formatado;
-    this.cnaeDescricao = atividade.descricao;
-    this.atividadePesquisa = `${atividade.codigo_formatado} - ${atividade.descricao}`;
+    if (!this.cnaesSelecionados.some((item) => item.codigo === atividade.codigo)) {
+      this.cnaesSelecionados = [...this.cnaesSelecionados, atividade];
+    }
+
+    this.atividadePesquisa = '';
     this.atividadesFiltradas = [];
     this.mostrarAtividades = false;
     this.mensagemErro = '';
   }
 
-  onCnaeInput(): void {
-    const cnaeAtual = this.limparCnae(this.cnae);
-
-    if (
-      this.atividadeSelecionada &&
-      cnaeAtual !== this.atividadeSelecionada.codigo
-    ) {
-      this.atividadeSelecionada = null;
-      this.atividadePesquisa = '';
-
-      this.cnaeFormatado = '';
-      this.cnaeDescricao = '';
-
-      this.atividadesFiltradas = [];
-      this.mostrarAtividades = false;
-    }
-
-    this.mensagemErro = '';
+  removerCnae(codigo: string): void {
+    this.cnaesSelecionados = this.cnaesSelecionados.filter(
+      (atividade) => atividade.codigo !== codigo,
+    );
   }
 
   abrirListaAtividades(): void {
@@ -609,11 +550,25 @@ export class ConsultaEmpresasComponent implements OnInit {
     }> = [];
 
     // CNAE / ATIVIDADE ECONÔMICA
-    if (this.cnae) {
+    this.cnaesSelecionados.forEach((atividade) => {
       criterios.push({
         label: 'CNAE',
-        valor: this.cnaeFormatado || this.formatarCnae(this.cnae),
-        descricao: this.cnaeDescricao || undefined,
+        valor: atividade.codigo_formatado || this.formatarCnae(atividade.codigo),
+        descricao: atividade.descricao,
+      });
+    });
+
+    if (this.cnae && !this.cnaesSelecionados.some((item) => item.codigo === this.cnae)) {
+      criterios.push({
+        label: 'CNAE',
+        valor: this.formatarCnae(this.cnae),
+      });
+    }
+
+    if (this.nomeEmpresa.trim()) {
+      criterios.push({
+        label: 'Empresa',
+        valor: this.nomeEmpresa.trim(),
       });
     }
 
@@ -660,6 +615,7 @@ export class ConsultaEmpresasComponent implements OnInit {
       const gerado = await this.gerarDocumento();
 
       if (gerado) {
+        this.empresasSelecionadas.clear();
         this.fecharModalContato();
       }
     } finally {
@@ -986,19 +942,34 @@ export class ConsultaEmpresasComponent implements OnInit {
       // TELEFONE / EMAIL
       // ---------------------------------------------------
 
+      const larguraColunaContato = (larguraConteudo - 16) / 3;
+      const segundaColunaContato = margem + larguraColunaContato + 8;
+      const terceiraColunaContato = margem + (larguraColunaContato + 8) * 2;
+
       doc.setTextColor(125, 138, 142);
       doc.setFontSize(7);
       doc.text('TELEFONE', margem, y);
-      doc.text('E-MAIL', margem + larguraColuna + 8, y);
+      doc.text('E-MAIL', segundaColunaContato, y);
+      if (this.dataLimiteRetorno) {
+        doc.text('DATA LIMITE PARA RETORNO', terceiraColunaContato, y);
+      }
+
       y += 4;
       doc.setTextColor(40, 58, 63);
       doc.setFontSize(9);
       doc.text(this.telefoneContatoFormatado(), margem, y);
       doc.text(
         this.emailContato || 'Não informado',
-        margem + larguraColuna + 8,
+        segundaColunaContato,
         y,
       );
+      if (this.dataLimiteRetorno) {
+        doc.text(
+          this.formatarDataBrasileira(this.dataLimiteRetorno),
+          terceiraColunaContato,
+          y,
+        );
+      }
 
       y += 12;
 
@@ -1080,48 +1051,6 @@ export class ConsultaEmpresasComponent implements OnInit {
 
         y += 5;
       });
-
-      // ===================================================
-      // DATA LIMITE
-      // ===================================================
-
-      if (this.dataLimiteRetorno) {
-        const alturaDataLimite = 15;
-
-        if (y + alturaDataLimite > alturaPagina - 40) {
-          doc.addPage();
-
-          y = this.adicionarCabecalhoPdf(doc, logoFornece, logoSde);
-
-          doc.setTextColor(7, 72, 90);
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(11);
-
-          doc.text('Informações da prospecção — continuação', margem, y);
-
-          y += 10;
-        }
-
-        doc.setTextColor(120, 135, 140);
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(7);
-
-        doc.text('DATA LIMITE PARA RETORNO', margem, y);
-
-        y += 4;
-
-        doc.setTextColor(45, 63, 68);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9);
-
-        doc.text(
-          this.formatarDataBrasileira(this.dataLimiteRetorno),
-          margem,
-          y,
-        );
-
-        y += 9;
-      }
 
       // ===================================================
       // OBSERVAÇÕES
@@ -1608,8 +1537,10 @@ export class ConsultaEmpresasComponent implements OnInit {
   }
 
   private gerarIdentificadorArquivoPdf(): string {
-    if (this.cnae) {
-      return `cnae-${this.cnae}`;
+    const cnaes = this.obterCnaesConsulta();
+
+    if (cnaes.length) {
+      return `cnaes-${cnaes.join('-')}`;
     }
 
     if (this.municipio) {
@@ -1642,6 +1573,16 @@ export class ConsultaEmpresasComponent implements OnInit {
 
   private limparCnae(valor: string): string {
     return String(valor || '').replace(/\D/g, '');
+  }
+
+  private obterCnaesConsulta(): string[] {
+    const codigos = this.cnaesSelecionados.map((atividade) => atividade.codigo);
+
+    if (this.cnae) {
+      codigos.push(this.cnae);
+    }
+
+    return [...new Set(codigos)];
   }
 
   private emailValido(email: string): boolean {
