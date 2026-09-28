@@ -1,0 +1,117 @@
+<main class="history-page">
+  <div class="history-container">
+    <header class="page-heading">
+      <div>
+        <span class="eyebrow">DOCUMENTOS DE PROSPECÇÃO</span>
+        <h1>{{ administrador ? 'Histórico de solicitações' : 'Minhas prospecções' }}</h1>
+        <p>
+          {{ administrador
+            ? 'Consulte os documentos gerados pelos usuários.'
+            : 'Consulte e baixe novamente os documentos que você gerou.' }}
+        </p>
+      </div>
+
+      <div class="request-count" aria-label="Total de solicitações">
+        <strong>{{ total }}</strong>
+        <span>{{ total === 1 ? 'solicitação' : 'solicitações' }}</span>
+      </div>
+    </header>
+
+    <form class="history-filters" (ngSubmit)="aplicarPesquisa()">
+      <label for="historicoPesquisa">Filtrar solicitações</label>
+      <div class="history-search-control">
+        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+        <input id="historicoPesquisa" name="pesquisa" type="search" [(ngModel)]="pesquisa"
+          placeholder="Assunto, contato, empresa ou CNPJ">
+        <button type="submit" title="Aplicar filtro" aria-label="Aplicar filtro">
+          <i class="fa-solid fa-arrow-right"></i>
+        </button>
+      </div>
+      <button type="button" class="clear-filter" *ngIf="pesquisaAplicada" (click)="limparPesquisa()">
+        Limpar filtro
+      </button>
+    </form>
+
+    <div class="history-error" *ngIf="erro" role="alert">
+      <i class="fa-solid fa-circle-exclamation"></i>
+      {{ erro }}
+    </div>
+
+    <section class="history-list" aria-label="Solicitações registradas">
+      <div class="loading-state" *ngIf="carregando">
+        <i class="fa-solid fa-spinner fa-spin"></i>
+        Carregando histórico...
+      </div>
+
+      <div class="empty-state" *ngIf="!carregando && !erro && historicos.length === 0">
+        <i class="fa-regular fa-folder-open"></i>
+        <h2>Nenhuma solicitação registrada</h2>
+        <p>Os documentos gerados aparecerão nesta lista.</p>
+      </div>
+
+      <article class="history-entry" *ngFor="let item of historicos">
+        <div class="entry-main">
+          <div class="entry-date">
+            <i class="fa-regular fa-calendar"></i>
+            {{ item.createdAt | date:'dd/MM/yyyy HH:mm' }}
+          </div>
+          <h2>{{ item.dados.contato.assuntoProspeccao }}</h2>
+          <div class="entry-summary">
+            <span>
+              <i class="fa-solid fa-building"></i>
+              {{ item.dados.empresas.length }} empresa(s)
+            </span>
+            <span *ngIf="item.dados.contato.responsavelContato">
+              <i class="fa-solid fa-user"></i>
+              {{ item.dados.contato.responsavelContato }}
+            </span>
+          </div>
+
+          <div class="entry-owner" *ngIf="administrador">
+            <i class="fa-solid fa-user-shield"></i>
+            <span>
+              <strong>{{ item.usuario?.nome || 'Usuário não identificado' }}</strong>
+              <small *ngIf="item.usuario?.email">{{ item.usuario?.email }}</small>
+            </span>
+          </div>
+
+          <details class="company-details">
+            <summary>Ver empresas incluídas</summary>
+            <ul>
+              <li *ngFor="let empresa of item.dados.empresas">
+                <strong>{{ empresa.razao_social || 'Razão social não informada' }}</strong>
+                <span>{{ empresa.cnpj }}</span>
+              </li>
+            </ul>
+          </details>
+        </div>
+
+        <div class="entry-actions">
+          <button type="button" class="edit-entry" *ngIf="!administrador" (click)="editarSolicitacao(item)"
+            [attr.aria-label]="'Editar solicitação: ' + item.dados.contato.assuntoProspeccao"
+            title="Editar solicitação">
+            <i class="fa-solid fa-pen-to-square"></i>
+            <span>Editar</span>
+          </button>
+          <button type="button" [disabled]="arquivoBaixandoId === item.id" (click)="baixarArquivo(item)"
+            [attr.aria-label]="'Baixar PDF: ' + item.nome_arquivo" title="Baixar PDF">
+            <i class="fa-solid" [ngClass]="arquivoBaixandoId === item.id ? 'fa-spinner fa-spin' : 'fa-download'"></i>
+            <span>{{ arquivoBaixandoId === item.id ? 'Baixando...' : 'Baixar PDF' }}</span>
+          </button>
+        </div>
+      </article>
+    </section>
+
+    <nav class="history-pagination" *ngIf="totalPaginas > 1" aria-label="Paginação do histórico">
+      <button type="button" [disabled]="pagina === 1 || carregando" (click)="mudarPagina(pagina - 1)">
+        <i class="fa-solid fa-chevron-left"></i>
+        Anterior
+      </button>
+      <span>Página {{ pagina }} de {{ totalPaginas }}</span>
+      <button type="button" [disabled]="pagina === totalPaginas || carregando" (click)="mudarPagina(pagina + 1)">
+        Próxima
+        <i class="fa-solid fa-chevron-right"></i>
+      </button>
+    </nav>
+  </div>
+</main>

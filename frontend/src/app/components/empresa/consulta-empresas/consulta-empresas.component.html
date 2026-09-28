@@ -53,10 +53,18 @@
           </p>
         </div>
 
-        <button type="button" class="btn-clear" (click)="limparPesquisa()">
-          <i class="fa-solid fa-rotate-left"></i>
-          Limpar filtros
-        </button>
+        <div class="search-header-actions">
+          <button type="button" class="btn-history" (click)="abrirHistorico()">
+            <i class="fa-solid fa-clock-rotate-left"></i>
+            Histórico
+            <span>{{ totalSolicitacoes }}</span>
+          </button>
+
+          <button type="button" class="btn-clear" (click)="limparPesquisa()">
+            <i class="fa-solid fa-rotate-left"></i>
+            Limpar filtros
+          </button>
+        </div>
       </div>
 
 
@@ -907,12 +915,13 @@
       <div>
 
         <h2>
-          Preparar contato
+          {{ historicoEditandoId ? 'Editar solicitação' : 'Preparar contato' }}
         </h2>
 
         <p>
-          Preencha as informações abaixo para gerar
-          o documento de prospecção.
+          {{ historicoEditandoId
+            ? 'Atualize os dados e as empresas; o PDF desta solicitação será substituído.'
+            : 'Preencha as informações abaixo para gerar o documento de prospecção.' }}
         </p>
 
       </div>
@@ -1216,10 +1225,87 @@
         {{
         gerandoDocumento
         ? 'Gerando documento...'
-        : 'Gerar documento (PDF)'
+        : (historicoEditandoId ? 'Salvar alterações (PDF)' : 'Gerar documento (PDF)')
         }}
 
       </button>
     </div>
   </div>
+</div>
+
+<div class="history-modal-backdrop" *ngIf="historicoAberto" (click)="fecharHistoricoBackdrop($event)">
+  <section class="history-modal" role="dialog" aria-modal="true" aria-labelledby="history-title">
+    <header class="history-modal-header">
+      <div>
+        <span>DOCUMENTOS GERADOS</span>
+        <h2 id="history-title">Histórico de prospecções</h2>
+        <p>{{ totalSolicitacoes }} solicitações registradas para sua conta</p>
+      </div>
+
+      <button type="button" class="modal-close" title="Fechar histórico" (click)="fecharHistorico()">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </header>
+
+    <div class="history-modal-content">
+      <div class="history-loading" *ngIf="historicoCarregando">
+        <i class="fa-solid fa-spinner fa-spin"></i>
+        Carregando histórico...
+      </div>
+
+      <div class="history-error" *ngIf="historicoErro">
+        <i class="fa-solid fa-circle-exclamation"></i>
+        {{ historicoErro }}
+      </div>
+
+      <div class="history-empty" *ngIf="!historicoCarregando && !historicoErro && !historico.length">
+        <i class="fa-regular fa-folder-open"></i>
+        <strong>Nenhuma solicitação registrada</strong>
+        <span>Os documentos gerados aparecerão aqui.</span>
+      </div>
+
+      <article class="history-entry" *ngFor="let registro of historico">
+        <div class="history-entry-date">
+          <i class="fa-regular fa-calendar"></i>
+          {{ registro.createdAt | date:'dd/MM/yyyy HH:mm' }}
+        </div>
+
+        <h3>{{ registro.dados.contato.assuntoProspeccao }}</h3>
+        <p>
+          {{ registro.dados.empresas.length }} empresa(s)
+          <span *ngIf="registro.dados.contato.responsavelContato">
+            · {{ registro.dados.contato.responsavelContato }}
+          </span>
+        </p>
+
+        <div class="history-entry-actions">
+          <button type="button" class="history-download" [disabled]="arquivoHistoricoBaixando === registro.id"
+            (click)="baixarHistorico(registro)" title="Baixar o PDF original">
+            <i class="fa-solid" [ngClass]="arquivoHistoricoBaixando === registro.id ? 'fa-spinner fa-spin' : 'fa-download'"></i>
+            Baixar PDF
+          </button>
+          <button type="button" class="history-restore" *ngIf="!administrador"
+            (click)="restaurarHistorico(registro)"
+            title="Restaurar contato e empresas para gerar novamente">
+            <i class="fa-solid fa-rotate-right"></i>
+            Usar novamente
+          </button>
+        </div>
+      </article>
+
+      <div class="history-pagination" *ngIf="totalPaginasHistorico > 1">
+        <button type="button" [disabled]="paginaHistorico === 1 || historicoCarregando"
+          (click)="mudarPaginaHistorico(paginaHistorico - 1)">
+          <i class="fa-solid fa-chevron-left"></i>
+          Anterior
+        </button>
+        <span>Página {{ paginaHistorico }} de {{ totalPaginasHistorico }}</span>
+        <button type="button" [disabled]="paginaHistorico === totalPaginasHistorico || historicoCarregando"
+          (click)="mudarPaginaHistorico(paginaHistorico + 1)">
+          Próxima
+          <i class="fa-solid fa-chevron-right"></i>
+        </button>
+      </div>
+    </div>
+  </section>
 </div>

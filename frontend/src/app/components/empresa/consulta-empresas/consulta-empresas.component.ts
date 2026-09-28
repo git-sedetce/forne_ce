@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { EmpresaService } from '../../../services/empresa.service';
-import { Subject } from 'rxjs';
+import { UserService } from '../../../services/user.service';
+import { firstValueFrom, Subject } from 'rxjs';
 import {
   debounceTime,
   distinctUntilChanged,
@@ -15,6 +16,10 @@ import {
   EmpresaJucec,
   EmpresasJucecResponse,
 } from '../../../interfaces/empresa-jucec.interface';
+import {
+  DadosHistoricoProspeccao,
+  HistoricoProspeccao,
+} from '../../../interfaces/historico-prospeccao.interface';
 
 @Component({
   selector: 'app-consulta-empresas',
@@ -153,6 +158,17 @@ export class ConsultaEmpresasComponent implements OnInit {
   dataLimiteRetorno = '';
   observacoesContato = '';
 
+  historicoAberto = false;
+  historicoCarregando = false;
+  historicoErro = '';
+  historico: HistoricoProspeccao[] = [];
+  totalSolicitacoes = 0;
+  paginaHistorico = 1;
+  totalPaginasHistorico = 1;
+  arquivoHistoricoBaixando: number | null = null;
+  readonly administrador: boolean;
+  historicoEditandoId: number | null = null;
+
   get exibirLogosInstitucionais(): boolean {
     const hoje = new Date();
     const dataExibicao = new Date(2026, 10, 1);
@@ -165,7 +181,12 @@ export class ConsultaEmpresasComponent implements OnInit {
 
   private atividadeSubject = new Subject<string>();
 
-  constructor(private empresaService: EmpresaService) {}
+  constructor(
+    private empresaService: EmpresaService,
+    userService: UserService,
+  ) {
+    this.administrador = Number(userService.getUser()?._profile_id) === 1;
+  }
 
   ngOnInit(): void {
     this.onRegiaoChange();
@@ -201,6 +222,19 @@ export class ConsultaEmpresasComponent implements OnInit {
           this.mostrarAtividades = false;
         },
       });
+
+    this.carregarHistorico(false);
+
+    if (typeof window !== 'undefined') {
+      const registro = window.history.state?.editarProspecao as
+        | HistoricoProspeccao
+        | undefined;
+
+      if (registro?.id) {
+        this.historicoEditandoId = registro.id;
+        this.restaurarHistorico(registro);
+      }
+    }
   }
 
   // =====================================================
@@ -616,6 +650,9 @@ export class ConsultaEmpresasComponent implements OnInit {
 
       if (gerado) {
         this.empresasSelecionadas.clear();
+        this.historicoEditandoId = null;
+        this.paginaHistorico = 1;
+        this.carregarHistorico(false);
         this.fecharModalContato();
       }
     } finally {
@@ -636,6 +673,107 @@ export class ConsultaEmpresasComponent implements OnInit {
     this.dataLimiteRetorno = '';
 
     this.observacoesContato = '';
+  }
+
+  abrirHistorico(): void {
+    this.historicoAberto = true;
+    this.carregarHistorico();
+  }
+
+  fecharHistorico(): void {
+    this.historicoAberto = false;
+    this.historicoErro = '';
+  }
+
+  fecharHistoricoBackdrop(event: MouseEvent): void {
+    if ((event.target as HTMLElement).classList.contains('history-modal-backdrop')) {
+      this.fecharHistorico();
+    }
+  }
+
+  private carregarHistorico(exibirCarregamento = true): void {
+    if (exibirCarregamento) {
+      this.historicoCarregando = true;
+    }
+
+    this.empresaService
+      .listarHistoricoProspeccoes(this.paginaHistorico)
+      .subscribe({
+      next: (response) => {
+        this.historico = response.dados;
+        this.totalSolicitacoes = response.total;
+        this.totalPaginasHistorico = Math.max(
+          Math.ceil(response.total / response.limite),
+          1,
+        );
+        this.historicoCarregando = false;
+      },
+      error: (error) => {
+        console.error('Erro ao carregar histórico de prospecções:', error);
+        this.historicoCarregando = false;
+        if (this.historicoAberto) {
+          this.historicoErro = 'Não foi possível carregar o histórico.';
+        }
+      },
+      });
+  }
+
+  mudarPaginaHistorico(pagina: number): void {
+    if (
+      pagina < 1 ||
+      pagina > this.totalPaginasHistorico ||
+      pagina === this.paginaHistorico ||
+      this.historicoCarregando
+    ) {
+      return;
+    }
+
+    this.paginaHistorico = pagina;
+    this.carregarHistorico();
+  }
+
+  async baixarHistorico(registro: HistoricoProspeccao): Promise<void> {
+    this.arquivoHistoricoBaixando = registro.id;
+    this.historicoErro = '';
+
+    try {
+      const arquivo = await firstValueFrom(
+        this.empresaService.baixarArquivoHistorico(registro.id),
+      );
+      const url = URL.createObjectURL(arquivo);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = registro.nome_arquivo;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      console.error('Erro ao baixar documento do histórico:', error);
+      this.historicoErro = 'Não foi possível baixar o documento selecionado.';
+    } finally {
+      this.arquivoHistoricoBaixando = null;
+    }
+  }
+
+  restaurarHistorico(registro: HistoricoProspeccao): void {
+    const { contato, empresas } = registro.dados;
+
+    this.assuntoProspeccao = contato.assuntoProspeccao;
+    this.servicoProjeto = contato.servicoProjeto;
+    this.responsavelContato = contato.responsavelContato;
+    this.cargoFuncao = contato.cargoFuncao;
+    this.telefoneContato = contato.telefoneContato;
+    this.emailContato = contato.emailContato;
+    this.dataLimiteRetorno = contato.dataLimiteRetorno;
+    this.observacoesContato = contato.observacoesContato;
+    this.empresasSelecionadas = new Map(
+      empresas.map((empresa) => [empresa.ocorrencia_id, empresa]),
+    );
+
+    this.fecharHistorico();
+    this.mensagemErroModal = '';
+    this.modalContatoAberto = true;
   }
 
   // =====================================================
@@ -1517,13 +1655,66 @@ export class ConsultaEmpresasComponent implements OnInit {
 
       const data = this.dataArquivoAtual();
       const identificador = this.gerarIdentificadorArquivoPdf();
-      doc.save(`prospeccao-fornece-${identificador}-${data}.pdf`);
+      const nomeArquivo = `prospeccao-fornece-${identificador}-${data}.pdf`;
+      const arquivoPdf = doc.output('blob');
+      const dadosHistorico: DadosHistoricoProspeccao = {
+        contato: {
+          assuntoProspeccao: this.assuntoProspeccao,
+          servicoProjeto: this.servicoProjeto,
+          responsavelContato: this.responsavelContato,
+          cargoFuncao: this.cargoFuncao,
+          telefoneContato: this.telefoneContato,
+          emailContato: this.emailContato,
+          dataLimiteRetorno: this.dataLimiteRetorno,
+          observacoesContato: this.observacoesContato,
+        },
+        empresas: this.selecionadas.map((empresa) => ({
+          ...empresa,
+          cnaes: [...empresa.cnaes],
+        })),
+      };
+
+      if (this.historicoEditandoId !== null) {
+        await firstValueFrom(
+          this.empresaService.atualizarHistoricoProspeccao(
+            this.historicoEditandoId,
+            nomeArquivo,
+            dadosHistorico,
+          ),
+        );
+        await firstValueFrom(
+          this.empresaService.salvarArquivoHistorico(
+            this.historicoEditandoId,
+            arquivoPdf,
+          ),
+        );
+      } else {
+        const registro = await firstValueFrom(
+          this.empresaService.criarHistoricoProspeccao(
+            nomeArquivo,
+            dadosHistorico,
+          ),
+        );
+
+        try {
+          await firstValueFrom(
+            this.empresaService.salvarArquivoHistorico(registro.id, arquivoPdf),
+          );
+        } catch (error) {
+          await firstValueFrom(
+            this.empresaService.removerHistoricoPendente(registro.id),
+          ).catch(() => undefined);
+          throw error;
+        }
+      }
+
+      doc.save(nomeArquivo);
       this.mensagemErroModal = '';
       return true;
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
       this.mensagemErroModal =
-        'Não foi possível gerar o documento PDF. Tente novamente.';
+        'Não foi possível gerar e registrar o documento. Verifique sua conexão e tente novamente.';
       return false;
     }
   }

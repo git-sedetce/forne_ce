@@ -1,0 +1,387 @@
+:host {
+  display: block;
+}
+
+.history-page {
+  min-height: calc(100vh - 90px);
+  padding: 36px 0 64px;
+  background: linear-gradient(135deg, #f4f8f9 0%, #ffffff 56%, #fff7f1 100%);
+}
+
+.history-container {
+  width: min(1120px, calc(100% - 40px));
+  margin: 0 auto;
+}
+
+.page-heading {
+  margin-bottom: 28px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.eyebrow {
+  color: #e76624;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.page-heading h1 {
+  margin: 7px 0 0;
+  color: #073f4d;
+  font-size: 32px;
+  line-height: 1.15;
+}
+
+.page-heading p {
+  margin: 8px 0 0;
+  color: #687b81;
+  font-size: 14px;
+}
+
+.request-count {
+  min-width: 130px;
+  padding: 12px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 8px;
+  background: #073f4d;
+  color: #ffffff;
+}
+
+.request-count strong {
+  font-size: 24px;
+}
+
+.request-count span {
+  color: #d7e6e9;
+  font-size: 11px;
+}
+
+.history-filters {
+  margin-bottom: 22px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.history-filters > label {
+  color: #294d56;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.history-search-control {
+  min-width: 0;
+  max-width: 620px;
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.history-search-control > i {
+  position: absolute;
+  left: 13px;
+  color: #758b90;
+  pointer-events: none;
+}
+
+.history-search-control input {
+  width: 100%;
+  height: 42px;
+  padding: 0 48px 0 39px;
+  border: 1px solid #cfdee2;
+  border-radius: 7px;
+  outline: none;
+  background: #ffffff;
+  color: #344e55;
+  font: inherit;
+  font-size: 13px;
+}
+
+.history-search-control input:focus {
+  border-color: #0a6578;
+  box-shadow: 0 0 0 3px rgba(10, 101, 120, 0.1);
+}
+
+.history-search-control button {
+  position: absolute;
+  right: 4px;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 5px;
+  background: #07586b;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.clear-filter {
+  border: 0;
+  background: transparent;
+  color: #a8542b;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.history-list {
+  border-top: 1px solid #dce7ea;
+}
+
+.history-entry {
+  padding: 20px 18px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  border-bottom: 1px solid #dce7ea;
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.entry-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.entry-date {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #71858a;
+  font-size: 11px;
+}
+
+.history-entry h2 {
+  margin: 8px 0 7px;
+  color: #173f49;
+  font-size: 17px;
+  overflow-wrap: anywhere;
+}
+
+.entry-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  color: #637a80;
+  font-size: 12px;
+}
+
+.entry-summary span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.entry-summary i {
+  color: #0a6578;
+}
+
+.entry-owner {
+  margin-top: 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: #07586b;
+}
+
+.entry-owner > i {
+  margin-top: 2px;
+}
+
+.entry-owner span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.entry-owner strong {
+  font-size: 12px;
+}
+
+.entry-owner small {
+  color: #71858a;
+  font-size: 11px;
+}
+
+.company-details {
+  margin-top: 13px;
+  color: #4b656c;
+  font-size: 12px;
+}
+
+.company-details summary {
+  width: fit-content;
+  color: #07586b;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.company-details ul {
+  margin: 9px 0 0;
+  padding-left: 18px;
+}
+
+.company-details li {
+  margin-top: 6px;
+  padding-left: 2px;
+}
+
+.company-details li strong {
+  margin-right: 8px;
+  color: #334f56;
+}
+
+.company-details li span {
+  color: #71858a;
+  font-size: 11px;
+}
+
+.entry-actions {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.entry-actions button,
+.history-pagination button {
+  min-height: 38px;
+  padding: 0 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid #07586b;
+  border-radius: 7px;
+  background: #07586b;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.entry-actions button:disabled,
+.history-pagination button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.entry-actions button.edit-entry {
+  border-color: #cbdde1;
+  background: #ffffff;
+  color: #07586b;
+}
+
+.history-pagination {
+  padding-top: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #71858a;
+  font-size: 12px;
+}
+
+.history-pagination button {
+  min-height: 34px;
+  border-color: #d4e0e3;
+  background: #ffffff;
+  color: #07586b;
+}
+
+.loading-state,
+.empty-state {
+  min-height: 260px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #71858a;
+  text-align: center;
+}
+
+.loading-state {
+  flex-direction: row;
+}
+
+.empty-state > i {
+  color: #94a8ad;
+  font-size: 34px;
+}
+
+.empty-state h2 {
+  margin: 0;
+  color: #3d5960;
+  font-size: 18px;
+}
+
+.empty-state p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.history-error {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #ffd7bf;
+  border-radius: 7px;
+  background: #fff5ee;
+  color: #9a481f;
+  font-size: 13px;
+}
+
+@media (max-width: 640px) {
+  .history-page {
+    padding: 24px 0 42px;
+  }
+
+  .history-container {
+    width: calc(100% - 24px);
+  }
+
+  .page-heading {
+    align-items: flex-start;
+  }
+
+  .history-filters {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .history-filters > label {
+    flex-basis: 100%;
+  }
+
+  .page-heading h1 {
+    font-size: 26px;
+  }
+
+  .request-count {
+    min-width: 88px;
+    padding: 9px 10px;
+  }
+
+  .history-entry {
+    flex-direction: column;
+    gap: 14px;
+    padding: 16px 12px;
+  }
+
+  .entry-actions {
+    width: 100%;
+  }
+
+  .entry-actions button {
+    flex: 1;
+  }
+}

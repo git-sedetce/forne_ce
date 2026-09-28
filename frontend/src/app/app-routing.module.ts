@@ -11,6 +11,7 @@ import { ConsultaEmpresasComponent } from './components/empresa/consulta-empresa
 import { SobreComponent } from './components/sobre/sobre.component';
 import { IndicadoresComponent } from './components/indicadores/indicadores.component';
 import { FirstLoginComponent } from './components/admin/first-login/first-login.component';
+import { HistoricoProspeccoesComponent } from './components/empresa/historico-prospeccoes/historico-prospeccoes.component';
 
 const routes: Routes = [
   { path: 'home', component: HomeComponent },
@@ -37,6 +38,12 @@ const routes: Routes = [
     component: ConsultaEmpresasComponent,
     canActivate: [authGuard, roleGuard],
     data: { roles: [1,2,3,4,5,6] },
+  },
+  {
+    path: 'historico-prospeccoes',
+    component: HistoricoProspeccoesComponent,
+    canActivate: [authGuard, roleGuard],
+    data: { roles: [1, 2, 3, 4, 5, 6] },
   },
 ];
 

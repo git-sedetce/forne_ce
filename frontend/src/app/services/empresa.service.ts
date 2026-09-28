@@ -6,6 +6,10 @@ import { environment } from '../../environments/environment.development';
 import { CnaeResponse } from '../interfaces/cnae.interface';
 import { EmpresasPesquisaResponse } from '../interfaces/empresa-pesquisa.interface';
 import { EmpresasJucecResponse } from '../interfaces/empresa-jucec.interface';
+import {
+  DadosHistoricoProspeccao,
+  HistoricoProspeccaoResponse,
+} from '../interfaces/historico-prospeccao.interface';
 
 @Injectable({
   providedIn: 'root',
@@ -163,6 +167,67 @@ export class EmpresaService {
       {
         params,
       },
+    );
+  }
+
+  criarHistoricoProspeccao(
+    nomeArquivo: string,
+    dados: DadosHistoricoProspeccao,
+  ): Observable<{ id: number }> {
+    return this.http.post<{ id: number }>(
+      `${this.apiUrl}/historico-prospeccoes`,
+      { nome_arquivo: nomeArquivo, dados },
+    );
+  }
+
+  salvarArquivoHistorico(id: number, arquivo: Blob): Observable<void> {
+    return this.http.put<void>(
+      `${this.apiUrl}/historico-prospeccoes/${id}/arquivo`,
+      arquivo,
+      { headers: { 'Content-Type': 'application/pdf' } },
+    );
+  }
+
+  listarHistoricoProspeccoes(
+    page: number = 1,
+    limit: number = 50,
+    pesquisa: string = '',
+  ): Observable<HistoricoProspeccaoResponse> {
+    let params = new HttpParams()
+      .set('page', String(page))
+      .set('limit', String(limit));
+
+    if (pesquisa.trim()) {
+      params = params.set('pesquisa', pesquisa.trim());
+    }
+
+    return this.http.get<HistoricoProspeccaoResponse>(
+      `${this.apiUrl}/historico-prospeccoes`,
+      { params },
+    );
+  }
+
+  atualizarHistoricoProspeccao(
+    id: number,
+    nomeArquivo: string,
+    dados: DadosHistoricoProspeccao,
+  ): Observable<void> {
+    return this.http.put<void>(
+      `${this.apiUrl}/historico-prospeccoes/${id}`,
+      { nome_arquivo: nomeArquivo, dados },
+    );
+  }
+
+  baixarArquivoHistorico(id: number): Observable<Blob> {
+    return this.http.get(
+      `${this.apiUrl}/historico-prospeccoes/${id}/arquivo`,
+      { responseType: 'blob' },
+    );
+  }
+
+  removerHistoricoPendente(id: number): Observable<void> {
+    return this.http.delete<void>(
+      `${this.apiUrl}/historico-prospeccoes/${id}`,
     );
   }
 }
