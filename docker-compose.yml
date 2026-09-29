@@ -16,7 +16,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
 
     ports:
-      - "${DB_PORT:-5433}:5432"
+      - "${DB_PORT:-8111}:5432"
 
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -70,7 +70,7 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
 
     ports:
-      - "${API_PORT:-8109}:3000"
+      - "${API_PORT:-8110}:3000"
 
     depends_on:
       postgres:
@@ -91,7 +91,7 @@ services:
 
     ports:
       # Porta do computador : porta do Nginx
-      - "${FRONTEND_PORT:-8080}:80"
+      - "${FRONTEND_PORT:-8009}:80"
 
     depends_on:
       api:
