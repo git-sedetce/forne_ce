@@ -13,7 +13,9 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 var corsOptions = {
   origin: [
-    'http://localhost:2609', 
+    'http://localhost:2609',
+    'http://localhost:8108',
+    'https://localhost:8108', 
     'http://fornece.sde.ce.gov.br', 
     'https://fornece.sde.ce.gov.br'
   ],
@@ -26,7 +28,7 @@ app.use(cors(corsOptions));
 
 routes(app)
 
-const port = process.env.PORT || 3108
+const port = process.env.API_PORT || 8109
 
 app.listen(port, () => console.log(`O servidor está On Port: ${port}`))
 

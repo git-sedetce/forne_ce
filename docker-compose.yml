@@ -70,7 +70,7 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
 
     ports:
-      - "${API_PORT:-3108}:3000"
+      - "${API_PORT:-8109}:3000"
 
     depends_on:
       postgres:
@@ -91,7 +91,7 @@ services:
 
     ports:
       # Porta do computador : porta do Nginx
-      - "${FRONTEND_PORT:-8108}:80"
+      - "${FRONTEND_PORT:-8080}:80"
 
     depends_on:
       api:
