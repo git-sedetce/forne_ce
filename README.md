@@ -1481,6 +1481,9 @@ PYTHONPATH=src python src/run_etl.py --check
 
 # Executar
 PYTHONPATH=src python src/run_etl.py
+
+# Executar dados da JUCEC
+python src/etl_junta_empresas.py
 ```
 
 ---

@@ -91,7 +91,7 @@ services:
 
     ports:
       # Porta do computador : porta do Nginx
-      - "${FRONTEND_PORT:-8080}:80"
+      - "${FRONTEND_PORT:-8108}:80"
 
     depends_on:
       api:
