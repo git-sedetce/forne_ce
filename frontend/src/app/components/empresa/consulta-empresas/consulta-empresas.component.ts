@@ -296,19 +296,12 @@ export class ConsultaEmpresasComponent implements OnInit {
       .subscribe({
         next: (response: EmpresasJucecResponse) => {
           this.pesquisou = true;
-
           this.empresas = response.dados;
-
           this.pagina = response.paginacao.pagina;
-
           this.limite = response.paginacao.limite;
-
           this.totalItens = response.paginacao.total_itens;
-
           this.totalPaginas = response.paginacao.total_paginas;
-
           this.competencia = response.filtros.competencia;
-
         },
 
         error: (error) => {
