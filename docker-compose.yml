@@ -56,6 +56,7 @@ services:
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_POOL_MAX: ${DB_POOL_MAX:-10}
+      BRAVE_SEARCH_API_KEY: ${BRAVE_SEARCH_API_KEY}
 
       # A API escuta na porta 3000 dentro do container
       API_PORT: 3000
@@ -76,6 +77,45 @@ services:
       postgres:
         condition: service_healthy
 
+  
+  # ==========================================================
+  # WORKER - ENRIQUECIMENTO DE CONTATOS COMERCIAIS
+  # ==========================================================
+
+  enriquecimento-worker:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+
+    container_name: observatorio-enriquecimento-worker
+    restart: unless-stopped
+
+    environment:
+      NODE_ENV: production
+
+      # Conexão PostgreSQL entre containers
+      DB_HOST: postgres
+      DB_PORT: 5432
+
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_POOL_MAX: ${DB_POOL_MAX:-10}
+      BRAVE_SEARCH_API_KEY: ${BRAVE_SEARCH_API_KEY}
+
+      # Intervalo de consulta à fila (10 segundos)
+      ENRIQUECIMENTO_INTERVALO_MS: 10000
+
+    # Sobrescreve o CMD padrão do Dockerfile
+    command:
+      - node
+      - src/workers/enriquecimento.worker.js
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    stop_grace_period: 60s
 
   # ==========================================================
   # FRONTEND ANGULAR + NGINX

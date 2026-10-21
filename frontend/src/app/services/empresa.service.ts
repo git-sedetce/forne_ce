@@ -5,7 +5,10 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { environment } from '../../environments/environment.development';
 import { CnaeResponse } from '../interfaces/cnae.interface';
 import { EmpresasPesquisaResponse } from '../interfaces/empresa-pesquisa.interface';
-import { EmpresasJucecResponse } from '../interfaces/empresa-jucec.interface';
+import {
+  ContatoComercial,
+  EmpresasJucecResponse,
+} from '../interfaces/empresa-jucec.interface';
 import {
   DadosHistoricoProspeccao,
   HistoricoProspeccaoResponse,
@@ -212,22 +215,45 @@ export class EmpresaService {
     nomeArquivo: string,
     dados: DadosHistoricoProspeccao,
   ): Observable<void> {
-    return this.http.put<void>(
-      `${this.apiUrl}/historico-prospeccoes/${id}`,
-      { nome_arquivo: nomeArquivo, dados },
-    );
+    return this.http.put<void>(`${this.apiUrl}/historico-prospeccoes/${id}`, {
+      nome_arquivo: nomeArquivo,
+      dados,
+    });
   }
 
   baixarArquivoHistorico(id: number): Observable<Blob> {
-    return this.http.get(
-      `${this.apiUrl}/historico-prospeccoes/${id}/arquivo`,
-      { responseType: 'blob' },
-    );
+    return this.http.get(`${this.apiUrl}/historico-prospeccoes/${id}/arquivo`, {
+      responseType: 'blob',
+    });
   }
 
   removerHistoricoPendente(id: number): Observable<void> {
-    return this.http.delete<void>(
-      `${this.apiUrl}/historico-prospeccoes/${id}`,
-    );
+    return this.http.delete<void>(`${this.apiUrl}/historico-prospeccoes/${id}`);
+  }
+
+  // =====================================================
+  // Pesquisar email e website da empresa
+  // =====================================================
+
+  solicitarEnriquecimento(cnpjs: string[]) {
+    return this.http.post<{
+      dados: Array<{
+        cnpj: string;
+        status: string;
+        contato: ContatoComercial | null;
+      }>;
+    }>(`${this.apiUrl}/empresas/enriquecimento/solicitar`, { cnpjs });
+  }
+
+  consultarEnriquecimento(cnpj: string) {
+    return this.http.get<{
+      cnpj: string;
+      contato: ContatoComercial | null;
+      processamento: {
+        status: string;
+        tentativas: number;
+        erro: string | null;
+      } | null;
+    }>(`${this.apiUrl}/empresas/enriquecimento/${cnpj}`);
   }
 }

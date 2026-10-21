@@ -710,6 +710,59 @@
   font-size: 21px;
 }
 
+/* ==========================================
+   BOTÃO LOCALIZAR CONTATOS COMERCIAIS
+========================================== */
+
+.btn-enriquecimento {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+
+  width: 100%;
+  padding: 13px 16px;
+
+  background: #0066a4;
+  color: #ffffff;
+
+  border: none;
+  border-radius: 10px;
+
+  font-size: 14px;
+  font-weight: 600;
+
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-enriquecimento:hover:not(:disabled) {
+  background: #004f80;
+  transform: translateY(-1px);
+}
+
+.btn-enriquecimento:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn-enriquecimento i {
+  font-size: 15px;
+}
+
+/* Espaçamento entre os botões */
+
+.selected-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.selected-actions .btn-document {
+  width: 100%;
+}
+
+
 /* =====================================================
    TOOLBAR
 ===================================================== */

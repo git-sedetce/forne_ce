@@ -154,8 +154,7 @@
 
           <div class="input-wrapper">
             <i class="fa-solid fa-magnifying-glass"></i>
-            <input id="cnae" type="text" [(ngModel)]="cnae" maxlength="10"
-              placeholder="Ex.: 1091101">
+            <input id="cnae" type="text" [(ngModel)]="cnae" maxlength="10" placeholder="Ex.: 1091101">
           </div>
 
           <small>
@@ -853,18 +852,55 @@
 
           <!-- GERAR DOCUMENTO -->
 
+
+          <!-- ==========================================
+     AÇÕES DAS EMPRESAS SELECIONADAS
+========================================== -->
+
           <div class="selected-actions">
 
+            <!-- LOCALIZAR CONTATOS COMERCIAIS -->
+            <button type="button" class="btn-enriquecimento" [disabled]="quantidadeSelecionadas === 0 || enriquecendo"
+              (click)="enriquecerSelecionadas()">
+
+              <i class="fa-solid" [ngClass]="
+        enriquecendo
+          ? 'fa-spinner fa-spin'
+          : 'fa-magnifying-glass'
+      ">
+              </i>
+
+              {{
+              enriquecendo
+              ? 'Solicitando pesquisa...'
+              : 'Localizar contatos comerciais'
+              }}
+
+            </button>
+
+            <!-- MENSAGEM DO ENRIQUECIMENTO -->
+            <div class="alert alert-info mt-2" *ngIf="mensagemEnriquecimento">
+
+              <i class="fa-solid fa-circle-info me-1"></i>
+
+              {{ mensagemEnriquecimento }}
+
+            </div>
+
+            <!-- PREPARAR CONTATO -->
             <button type="button" class="btn-document" [disabled]="!quantidadeSelecionadas"
               (click)="abrirModalContato()">
+
               <i class="fa-solid fa-handshake"></i>
 
               Preparar contato
+
             </button>
 
             <small>
-              O documento será gerado com os dados das
-              empresas selecionadas.
+              Localize os contatos comerciais das empresas
+              selecionadas antes de gerar o documento
+              de prospecção.
             </small>
 
           </div>
@@ -920,8 +956,8 @@
 
         <p>
           {{ historicoEditandoId
-            ? 'Atualize os dados e as empresas; o PDF desta solicitação será substituído.'
-            : 'Preencha as informações abaixo para gerar o documento de prospecção.' }}
+          ? 'Atualize os dados e as empresas; o PDF desta solicitação será substituído.'
+          : 'Preencha as informações abaixo para gerar o documento de prospecção.' }}
         </p>
 
       </div>
@@ -1281,11 +1317,11 @@
         <div class="history-entry-actions">
           <button type="button" class="history-download" [disabled]="arquivoHistoricoBaixando === registro.id"
             (click)="baixarHistorico(registro)" title="Baixar o PDF original">
-            <i class="fa-solid" [ngClass]="arquivoHistoricoBaixando === registro.id ? 'fa-spinner fa-spin' : 'fa-download'"></i>
+            <i class="fa-solid"
+              [ngClass]="arquivoHistoricoBaixando === registro.id ? 'fa-spinner fa-spin' : 'fa-download'"></i>
             Baixar PDF
           </button>
-          <button type="button" class="history-restore" *ngIf="!administrador"
-            (click)="restaurarHistorico(registro)"
+          <button type="button" class="history-restore" *ngIf="!administrador" (click)="restaurarHistorico(registro)"
             title="Restaurar contato e empresas para gerar novamente">
             <i class="fa-solid fa-rotate-right"></i>
             Usar novamente

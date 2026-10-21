@@ -13,6 +13,7 @@ import { jsPDF } from 'jspdf';
 import { MUNICIPIOS_POR_REGIAO } from '../../../data/regioes-ce';
 import { CnaeItem } from '../../../interfaces/cnae.interface';
 import {
+  ContatoComercial,
   EmpresaJucec,
   EmpresasJucecResponse,
 } from '../../../interfaces/empresa-jucec.interface';
@@ -61,6 +62,9 @@ export class ConsultaEmpresasComponent implements OnInit {
   porte = '';
   municipiosFiltrados: string[] = [];
 
+  enriquecendo = false;
+  mensagemEnriquecimento = '';
+
   // readonly portes: Record<string, string> = {
   //   '00': 'Não informado',
   //   '01': 'Micro Empresa',
@@ -80,7 +84,9 @@ export class ConsultaEmpresasComponent implements OnInit {
 
   get cnaeManualJaSelecionado(): boolean {
     const codigo = this.limparCnae(this.cnae);
-    return this.cnaesSelecionados.some((atividade) => atividade.codigo === codigo);
+    return this.cnaesSelecionados.some(
+      (atividade) => atividade.codigo === codigo,
+    );
   }
 
   get possuiFiltrosGeograficos(): boolean {
@@ -399,6 +405,78 @@ export class ConsultaEmpresasComponent implements OnInit {
   }
 
   // =====================================================
+  // ENRIQUECIMENTO DA CONSULTA
+  // =====================================================
+
+  enriquecerSelecionadas(): void {
+    const cnpjs = [
+      ...new Set(
+        this.selecionadas.map((empresa) =>
+          String(empresa.cnpj).replace(/\D/g, ''),
+        ),
+      ),
+    ];
+
+    if (!cnpjs.length) {
+      this.mensagemErro = 'Selecione pelo menos uma empresa.';
+      return;
+    }
+
+    this.enriquecendo = true;
+    this.mensagemEnriquecimento = '';
+
+    this.empresaService
+      .solicitarEnriquecimento(cnpjs)
+      .pipe(
+        finalize(() => {
+          this.enriquecendo = false;
+        }),
+      )
+      .subscribe({
+        next: (response) => {
+          for (const resultado of response.dados) {
+            if (!resultado.contato) continue;
+
+            this.atualizarContatoNaTela(resultado.cnpj, resultado.contato);
+          }
+
+          this.mensagemEnriquecimento =
+            'Solicitação registrada. Os contatos ' +
+            'pendentes serão pesquisados em segundo plano.';
+        },
+        error: (error) => {
+          this.mensagemErro =
+            error?.error?.message ||
+            'Não foi possível solicitar o enriquecimento.';
+        },
+      });
+  }
+
+  private atualizarContatoNaTela(
+    cnpj: string,
+    contato: ContatoComercial,
+  ): void {
+    const aplicar = (empresa: EmpresaJucec) => {
+      if (empresa.cnpj !== cnpj) return empresa;
+
+      return {
+        ...empresa,
+        email_comercial: contato.email_comercial,
+        website: contato.website,
+        contato_comercial: contato,
+      };
+    };
+
+    this.empresas = this.empresas.map(aplicar);
+
+    for (const [id, empresa] of this.empresasSelecionadas) {
+      if (empresa.cnpj === cnpj) {
+        this.empresasSelecionadas.set(id, aplicar(empresa));
+      }
+    }
+  }
+
+  // =====================================================
   // SELEÇÃO
   // =====================================================
 
@@ -468,7 +546,9 @@ export class ConsultaEmpresasComponent implements OnInit {
   }
 
   selecionarAtividade(atividade: CnaeItem): void {
-    if (!this.cnaesSelecionados.some((item) => item.codigo === atividade.codigo)) {
+    if (
+      !this.cnaesSelecionados.some((item) => item.codigo === atividade.codigo)
+    ) {
       this.cnaesSelecionados = [...this.cnaesSelecionados, atividade];
     }
 
@@ -580,12 +660,16 @@ export class ConsultaEmpresasComponent implements OnInit {
     this.cnaesSelecionados.forEach((atividade) => {
       criterios.push({
         label: 'CNAE',
-        valor: atividade.codigo_formatado || this.formatarCnae(atividade.codigo),
+        valor:
+          atividade.codigo_formatado || this.formatarCnae(atividade.codigo),
         descricao: atividade.descricao,
       });
     });
 
-    if (this.cnae && !this.cnaesSelecionados.some((item) => item.codigo === this.cnae)) {
+    if (
+      this.cnae &&
+      !this.cnaesSelecionados.some((item) => item.codigo === this.cnae)
+    ) {
       criterios.push({
         label: 'CNAE',
         valor: this.formatarCnae(this.cnae),
@@ -679,7 +763,9 @@ export class ConsultaEmpresasComponent implements OnInit {
   }
 
   fecharHistoricoBackdrop(event: MouseEvent): void {
-    if ((event.target as HTMLElement).classList.contains('history-modal-backdrop')) {
+    if (
+      (event.target as HTMLElement).classList.contains('history-modal-backdrop')
+    ) {
       this.fecharHistorico();
     }
   }
@@ -692,22 +778,22 @@ export class ConsultaEmpresasComponent implements OnInit {
     this.empresaService
       .listarHistoricoProspeccoes(this.paginaHistorico)
       .subscribe({
-      next: (response) => {
-        this.historico = response.dados;
-        this.totalSolicitacoes = response.total;
-        this.totalPaginasHistorico = Math.max(
-          Math.ceil(response.total / response.limite),
-          1,
-        );
-        this.historicoCarregando = false;
-      },
-      error: (error) => {
-        console.error('Erro ao carregar histórico de prospecções:', error);
-        this.historicoCarregando = false;
-        if (this.historicoAberto) {
-          this.historicoErro = 'Não foi possível carregar o histórico.';
-        }
-      },
+        next: (response) => {
+          this.historico = response.dados;
+          this.totalSolicitacoes = response.total;
+          this.totalPaginasHistorico = Math.max(
+            Math.ceil(response.total / response.limite),
+            1,
+          );
+          this.historicoCarregando = false;
+        },
+        error: (error) => {
+          console.error('Erro ao carregar histórico de prospecções:', error);
+          this.historicoCarregando = false;
+          if (this.historicoAberto) {
+            this.historicoErro = 'Não foi possível carregar o histórico.';
+          }
+        },
       });
   }
 
@@ -1089,11 +1175,7 @@ export class ConsultaEmpresasComponent implements OnInit {
       doc.setTextColor(40, 58, 63);
       doc.setFontSize(9);
       doc.text(this.telefoneContatoFormatado(), margem, y);
-      doc.text(
-        this.emailContato || 'Não informado',
-        segundaColunaContato,
-        y,
-      );
+      doc.text(this.emailContato || 'Não informado', segundaColunaContato, y);
       if (this.dataLimiteRetorno) {
         doc.text(
           this.formatarDataBrasileira(this.dataLimiteRetorno),
@@ -1312,7 +1394,10 @@ export class ConsultaEmpresasComponent implements OnInit {
           empresa.telefone,
         );
 
-        const email = empresa.email || 'Não informado';
+        const email =
+          empresa.contato_comercial?.status_verificacao === 'VERIFICADO'
+            ? empresa.email_comercial || 'Não localizado'
+            : 'Contato comercial não verificado';
         const enderecoTexto = this.enderecoCompleto(empresa);
 
         // =================================================

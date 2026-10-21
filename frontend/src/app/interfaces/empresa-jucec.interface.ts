@@ -38,6 +38,20 @@ export interface EmpresaJucec {
   competencia: string;
 
   cnaes: JucecCnae[];
+
+
+  // ==========================================
+  // ENRIQUECIMENTO DE CONTATOS COMERCIAIS
+  // ==========================================
+
+  email_comercial?: string | null;
+  website?: string | null;
+  telefone_comercial?: string | null;
+  whatsapp?: string | null;
+  instagram?: string | null;
+
+  contato_comercial?: ContatoComercial | null;
+
 }
 
 export interface EmpresasJucecResponse {
@@ -69,3 +83,25 @@ export interface EmpresasJucecResponse {
 
   dados: EmpresaJucec[];
 }
+
+
+export interface ContatoComercial {
+  cnpj: string;
+  email_comercial: string | null;
+  website: string | null;
+  telefone_comercial: string | null;
+  whatsapp: string | null;
+  instagram: string | null;
+  fonte: string | null;
+  url_fonte: string | null;
+  confianca: number;
+  status_verificacao:
+    | 'PENDENTE'
+    | 'EM_ANALISE'
+    | 'VERIFICADO'
+    | 'NAO_ENCONTRADO'
+    | 'REVISAR'
+    | 'ERRO';
+  verificado_em: string | null;
+}
+

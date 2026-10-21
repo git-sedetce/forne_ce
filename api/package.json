@@ -9,7 +9,8 @@
     "db:migrate": "sequelize-cli db:migrate",
     "db:migrate:status": "sequelize-cli db:migrate:status",
     "db:migrate:undo": "sequelize-cli db:migrate:undo",
-    "db:seed": "sequelize-cli db:seed:all"
+    "db:seed": "sequelize-cli db:seed:all",
+    "worker:enriquecimento": "node src/workers/enriquecimento.worker.js"
   },
   "repository": {
     "type": "git",
