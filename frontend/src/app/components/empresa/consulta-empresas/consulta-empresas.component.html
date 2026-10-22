@@ -640,16 +640,103 @@
                 <div class="info-item">
                   <i class="fa-solid fa-envelope"></i>
                   <div>
-                    <span>E-mail</span>
+                      <span>E-mail informado à JUCEC</span>
                     <strong>
                       {{
                       empresa.email ||
                       'Não informado'
                       }}
                     </strong>
+                      <small>
+                        Dado cadastral; pode não ser um contato comercial.
+                      </small>
+                    </div>
+                </div>
+
+                <!-- E-MAIL COMERCIAL ENCONTRADO -->
+
+                <div class="info-item">
+                    <i class="fa-solid fa-at"></i>
+                    <div>
+                      <span>
+                        {{
+                        empresa.contato_comercial?.status_verificacao === 'VERIFICADO'
+                          ? 'E-mail comercial verificado'
+                          : 'E-mail comercial (não verificado)'
+                        }}
+                      </span>
+                      <strong>
+                        <a *ngIf="empresa.email_comercial"
+                          [href]="'mailto:' + empresa.email_comercial">
+                          {{ empresa.email_comercial }}
+                        </a>
+                        <ng-container *ngIf="!empresa.email_comercial">
+                          {{ statusContatoComercial(empresa) }}
+                        </ng-container>
+                      </strong>
+                      <small *ngIf="erroEnriquecimento[empresa.cnpj]">
+                        {{ erroEnriquecimento[empresa.cnpj] }}
+                      </small>
+                    </div>
+                </div>
+
+                <!-- SITE COMERCIAL ENCONTRADO -->
+
+                <div class="info-item">
+                    <i class="fa-solid fa-globe"></i>
+                    <div>
+                      <span>Site encontrado</span>
+                      <strong>
+                        <a *ngIf="empresa.website"
+                          [href]="empresa.website"
+                          target="_blank"
+                          rel="noopener noreferrer">
+                          {{ empresa.website }}
+                        </a>
+                        <ng-container *ngIf="!empresa.website">
+                          {{ statusContatoComercial(empresa) }}
+                        </ng-container>
+                      </strong>
+                    </div>
+                </div>
+
+                <div class="info-item">
+                  <i class="fa-solid fa-phone-volume"></i>
+                  <div>
+                    <span>Telefone comercial</span>
+                    <strong>
+                      {{ empresa.contato_comercial?.telefone_comercial || 'Não informado' }}
+                    </strong>
                   </div>
                 </div>
 
+                <div class="info-item">
+                  <i class="fa-brands fa-whatsapp"></i>
+                  <div>
+                    <span>WhatsApp</span>
+                    <strong>
+                      {{ empresa.contato_comercial?.whatsapp || 'Não informado' }}
+                    </strong>
+                  </div>
+                </div>
+
+                <div class="info-item">
+                  <i class="fa-brands fa-instagram"></i>
+                  <div>
+                    <span>Instagram</span>
+                    <strong>
+                      <a *ngIf="empresa.contato_comercial?.instagram"
+                        [href]="linkInstagram(empresa.contato_comercial?.instagram)"
+                        target="_blank"
+                        rel="noopener noreferrer">
+                        {{ empresa.contato_comercial?.instagram }}
+                      </a>
+                      <ng-container *ngIf="!empresa.contato_comercial?.instagram">
+                        Não informado
+                      </ng-container>
+                    </strong>
+                  </div>
+                </div>
 
                 <!-- PORTE -->
 
@@ -662,6 +749,17 @@
                     </strong>
                   </div>
                 </div>
+              </div>
+
+              <div class="company-contact-edit">
+                <button type="button" class="btn-edit-contact"
+                  (click)="abrirEdicaoContato(empresa)">
+                  <i class="fa-solid fa-pen-to-square"></i>
+                  Editar contatos comerciais
+                </button>
+                <small *ngIf="empresa.contato_comercial?.fonte">
+                  Fonte: {{ empresa.contato_comercial?.fonte }}
+                </small>
               </div>
 
               <div class="company-cnaes" *ngIf="empresa.cnaes?.length">
@@ -1343,5 +1441,91 @@
         </button>
       </div>
     </div>
+  </section>
+</div>
+
+<div class="contact-edit-backdrop" *ngIf="modalEdicaoContatoAberto"
+  (click)="fecharEdicaoContatoBackdrop($event)">
+  <section class="contact-edit-modal" role="dialog" aria-modal="true"
+    aria-labelledby="contact-edit-title">
+    <header class="contact-edit-header">
+      <div>
+        <span>CONTATO COMERCIAL</span>
+        <h2 id="contact-edit-title">Editar contatos da empresa</h2>
+        <p>
+          {{ empresaEditandoContato?.nome_fantasia ||
+          empresaEditandoContato?.razao_social }}
+          · {{ formatarCnpj(empresaEditandoContato?.cnpj || '') }}
+        </p>
+      </div>
+      <button type="button" class="contact-edit-close" title="Fechar"
+        [disabled]="salvandoContatoComercial"
+        (click)="fecharEdicaoContato()">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </header>
+
+    <form (ngSubmit)="salvarContatoComercial()">
+      <div class="contact-edit-fields">
+        <label>
+          E-mail comercial
+          <input type="email" name="email_comercial"
+            [(ngModel)]="contatoComercialEdicao.email_comercial"
+            maxlength="255" autocomplete="email">
+        </label>
+
+        <label>
+          Site
+          <input type="url" name="website"
+            [(ngModel)]="contatoComercialEdicao.website"
+            maxlength="2000" placeholder="https://exemplo.com.br">
+        </label>
+
+        <label>
+          Telefone comercial
+          <input type="tel" name="telefone_comercial"
+            [(ngModel)]="contatoComercialEdicao.telefone_comercial"
+            maxlength="30" autocomplete="tel">
+        </label>
+
+        <label>
+          WhatsApp
+          <input type="tel" name="whatsapp"
+            [(ngModel)]="contatoComercialEdicao.whatsapp"
+            maxlength="30" autocomplete="tel">
+        </label>
+
+        <label class="contact-edit-full">
+          Instagram
+          <input type="text" name="instagram"
+            [(ngModel)]="contatoComercialEdicao.instagram"
+            maxlength="2000" placeholder="@perfil ou https://instagram.com/perfil">
+        </label>
+      </div>
+
+      <p class="contact-edit-provenance">
+        <i class="fa-solid fa-circle-info"></i>
+        A fonte será registrada automaticamente com seu nome de usuário.
+      </p>
+
+      <div class="contact-edit-error" *ngIf="erroEdicaoContato">
+        <i class="fa-solid fa-circle-exclamation"></i>
+        {{ erroEdicaoContato }}
+      </div>
+
+      <footer class="contact-edit-footer">
+        <button type="button" class="contact-edit-cancel"
+          [disabled]="salvandoContatoComercial"
+          (click)="fecharEdicaoContato()">
+          Cancelar
+        </button>
+        <button type="submit" class="contact-edit-save"
+          [disabled]="salvandoContatoComercial">
+          <i class="fa-solid"
+            [ngClass]="salvandoContatoComercial ? 'fa-spinner fa-spin' : 'fa-floppy-disk'"></i>
+          {{ salvandoContatoComercial ? 'Salvando...' : 'Salvar contatos' }}
+        </button>
+      </footer>
+    </form>
   </section>
 </div>

@@ -2553,6 +2553,25 @@ class EmpresaControllers {
             je.telefone,
             je.email,
 
+            ecc.email_comercial,
+            ecc.website,
+            CASE
+              WHEN ecc.cnpj IS NOT NULL THEN json_build_object(
+                'cnpj', ecc.cnpj,
+                'email_comercial', ecc.email_comercial,
+                'website', ecc.website,
+                'telefone_comercial', ecc.telefone_comercial,
+                'whatsapp', ecc.whatsapp,
+                'instagram', ecc.instagram,
+                'fonte', ecc.fonte,
+                'url_fonte', ecc.url_fonte,
+                'confianca', ecc.confianca,
+                'status_verificacao', ecc.status_verificacao,
+                'verificado_em', ecc.verificado_em
+              )
+              ELSE NULL
+            END AS contato_comercial,
+
             -- ---------------------------------------------
             -- SIMPLES
             -- ---------------------------------------------
@@ -2604,6 +2623,9 @@ class EmpresaControllers {
             ) AS cnaes
 
           FROM public.junta_empresas je
+
+          LEFT JOIN public.empresas_contatos_comerciais ecc
+            ON ecc.cnpj = je.cnpj
 
           WHERE
             ${whereSql}

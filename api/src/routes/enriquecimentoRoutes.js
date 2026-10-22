@@ -9,5 +9,6 @@ var checkRole = require("../services/checkRole");
 
 router.post('/empresas/enriquecimento/solicitar', auth.authenticatedUser, checkRole.checkRole([1,2,3,4,5]), EnriquecimentoController.solicitar);
 router.get('/empresas/enriquecimento/:cnpj', auth.authenticatedUser, checkRole.checkRole([1,2,3,4,5]), EnriquecimentoController.consultar);
+router.put('/empresas/enriquecimento/:cnpj/contato', auth.authenticatedUser, checkRole.checkRole([1,2,3,4,5]), EnriquecimentoController.atualizarContato);
 
 module.exports = router;

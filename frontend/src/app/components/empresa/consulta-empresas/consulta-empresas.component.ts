@@ -1,12 +1,14 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { EmpresaService } from '../../../services/empresa.service';
 import { UserService } from '../../../services/user.service';
-import { firstValueFrom, Subject } from 'rxjs';
+import { firstValueFrom, forkJoin, Subject, Subscription, timer } from 'rxjs';
 import {
   debounceTime,
   distinctUntilChanged,
   finalize,
   switchMap,
+  take,
+  takeWhile,
   tap,
 } from 'rxjs/operators';
 import { jsPDF } from 'jspdf';
@@ -28,7 +30,7 @@ import {
   templateUrl: './consulta-empresas.component.html',
   styleUrl: './consulta-empresas.component.css',
 })
-export class ConsultaEmpresasComponent implements OnInit {
+export class ConsultaEmpresasComponent implements OnInit, OnDestroy {
   // =====================================================
   // FILTROS
   // =====================================================
@@ -64,6 +66,20 @@ export class ConsultaEmpresasComponent implements OnInit {
 
   enriquecendo = false;
   mensagemEnriquecimento = '';
+  readonly statusEnriquecimento: Record<string, string> = {};
+  readonly erroEnriquecimento: Record<string, string> = {};
+  private enriquecimentoPolling?: Subscription;
+  empresaEditandoContato: EmpresaJucec | null = null;
+  modalEdicaoContatoAberto = false;
+  salvandoContatoComercial = false;
+  erroEdicaoContato = '';
+  contatoComercialEdicao = {
+    email_comercial: '',
+    website: '',
+    telefone_comercial: '',
+    whatsapp: '',
+    instagram: '',
+  };
 
   // readonly portes: Record<string, string> = {
   //   '00': 'Não informado',
@@ -241,6 +257,10 @@ export class ConsultaEmpresasComponent implements OnInit {
         this.restaurarHistorico(registro);
       }
     }
+  }
+
+  ngOnDestroy(): void {
+    this.enriquecimentoPolling?.unsubscribe();
   }
 
   // =====================================================
@@ -424,30 +444,233 @@ export class ConsultaEmpresasComponent implements OnInit {
 
     this.enriquecendo = true;
     this.mensagemEnriquecimento = '';
+    this.mensagemErro = '';
 
     this.empresaService
       .solicitarEnriquecimento(cnpjs)
+      .subscribe({
+        next: (response) => {
+          const pendentes: string[] = [];
+
+          for (const resultado of response.dados) {
+            this.statusEnriquecimento[resultado.cnpj] =
+              resultado.status === 'CACHE_VALIDO'
+                ? resultado.contato?.status_verificacao || 'CONCLUIDO'
+                : resultado.status;
+            delete this.erroEnriquecimento[resultado.cnpj];
+
+            if (resultado.contato) {
+              this.atualizarContatoNaTela(
+                resultado.cnpj,
+                resultado.contato,
+              );
+            }
+
+            if (resultado.status === 'AGENDADO') {
+              pendentes.push(resultado.cnpj);
+            }
+          }
+
+          if (pendentes.length) {
+            this.mensagemEnriquecimento =
+              'Pesquisa em andamento. Os contatos serão atualizados ' +
+              'nesta tela assim que o processamento terminar.';
+            this.acompanharEnriquecimento(pendentes);
+            return;
+          }
+
+          this.enriquecendo = false;
+          this.mensagemEnriquecimento =
+            'A pesquisa já estava concluída. Os contatos disponíveis ' +
+            'foram atualizados.';
+        },
+        error: (error) => {
+          this.enriquecendo = false;
+          this.mensagemErro =
+            error?.error?.message ||
+            'Não foi possível solicitar o enriquecimento.';
+        },
+      });
+  }
+
+  private acompanharEnriquecimento(cnpjs: string[]): void {
+    this.enriquecimentoPolling?.unsubscribe();
+
+    let processamentoPendente = false;
+    let encontrouErro = false;
+
+    this.enriquecimentoPolling = timer(0, 10000)
+      .pipe(
+        switchMap(() =>
+          forkJoin(
+            cnpjs.map((cnpj) =>
+              this.empresaService.consultarEnriquecimento(cnpj),
+            ),
+          ),
+        ),
+        tap((respostas) => {
+          processamentoPendente = false;
+
+          respostas.forEach((resposta, indice) => {
+            const cnpj = cnpjs[indice];
+            const status = resposta.processamento?.status;
+
+            this.statusEnriquecimento[cnpj] =
+              status === 'CONCLUIDO'
+                ? resposta.contato?.status_verificacao || status
+                : status ||
+                  resposta.contato?.status_verificacao ||
+                  'NAO_ENCONTRADO';
+
+            if (status === 'PENDENTE' || status === 'PROCESSANDO') {
+              processamentoPendente = true;
+            }
+
+            if (status === 'ERRO') {
+              encontrouErro = true;
+              this.erroEnriquecimento[cnpj] =
+                resposta.processamento?.erro ||
+                'O worker não conseguiu concluir a pesquisa.';
+            }
+
+            if (resposta.contato) {
+              this.atualizarContatoNaTela(cnpj, resposta.contato);
+            }
+          });
+        }),
+        takeWhile(() => processamentoPendente, true),
+        take(101),
+      )
+      .subscribe({
+        complete: () => {
+          this.enriquecendo = false;
+
+          if (processamentoPendente) {
+            this.mensagemEnriquecimento =
+              'A pesquisa ainda está em andamento. Atualize a consulta ' +
+              'mais tarde para verificar os contatos.';
+          } else if (encontrouErro) {
+            this.mensagemEnriquecimento =
+              'A pesquisa terminou, mas houve falha em uma ou mais empresas. ' +
+              'O detalhe está no cartão de cada empresa.';
+          } else {
+            this.mensagemEnriquecimento =
+              'Pesquisa concluída. Os contatos disponíveis foram atualizados.';
+          }
+        },
+        error: (error) => {
+          this.enriquecendo = false;
+          this.mensagemErro =
+            error?.error?.message ||
+            'Não foi possível consultar o andamento da pesquisa.';
+        },
+      });
+  }
+
+  statusContatoComercial(empresa: EmpresaJucec): string {
+    const status =
+      this.statusEnriquecimento[empresa.cnpj] ||
+      empresa.contato_comercial?.status_verificacao;
+
+    switch (status) {
+      case 'AGENDADO':
+      case 'PENDENTE':
+        return 'Pesquisa pendente';
+      case 'PROCESSANDO':
+      case 'EM_ANALISE':
+        return 'Pesquisa em andamento';
+      case 'VERIFICADO':
+        return 'Contato verificado';
+      case 'NAO_ENCONTRADO':
+        return 'Nenhum contato encontrado';
+      case 'REVISAR':
+        return 'Contato encontrado; requer conferência';
+      case 'ERRO':
+        return 'Falha na pesquisa';
+      case 'CONCLUIDO':
+        return 'Pesquisa concluída';
+      default:
+        return 'Ainda não pesquisado';
+    }
+  }
+
+  linkInstagram(valor: string | null | undefined): string {
+    const perfil = String(valor || '').trim();
+
+    if (/^https?:\/\//i.test(perfil)) return perfil;
+
+    return `https://www.instagram.com/${perfil.replace(/^@/, '')}/`;
+  }
+
+  abrirEdicaoContato(empresa: EmpresaJucec): void {
+    this.empresaEditandoContato = empresa;
+    this.contatoComercialEdicao = {
+      email_comercial: empresa.email_comercial || '',
+      website: empresa.website || '',
+      telefone_comercial: empresa.contato_comercial?.telefone_comercial || '',
+      whatsapp: empresa.contato_comercial?.whatsapp || '',
+      instagram: empresa.contato_comercial?.instagram || '',
+    };
+    this.erroEdicaoContato = '';
+    this.modalEdicaoContatoAberto = true;
+  }
+
+  fecharEdicaoContato(): void {
+    if (this.salvandoContatoComercial) return;
+
+    this.modalEdicaoContatoAberto = false;
+    this.empresaEditandoContato = null;
+    this.erroEdicaoContato = '';
+  }
+
+  fecharEdicaoContatoBackdrop(event: MouseEvent): void {
+    if (event.target === event.currentTarget) {
+      this.fecharEdicaoContato();
+    }
+  }
+
+  salvarContatoComercial(): void {
+    if (!this.empresaEditandoContato || this.salvandoContatoComercial) return;
+
+    const empresa = this.empresaEditandoContato;
+    const contato = {
+      email_comercial:
+        this.contatoComercialEdicao.email_comercial.trim() || null,
+      website: this.contatoComercialEdicao.website.trim() || null,
+      telefone_comercial:
+        this.contatoComercialEdicao.telefone_comercial.trim() || null,
+      whatsapp: this.contatoComercialEdicao.whatsapp.trim() || null,
+      instagram: this.contatoComercialEdicao.instagram.trim() || null,
+    };
+
+    if (!Object.values(contato).some(Boolean)) {
+      this.erroEdicaoContato =
+        'Preencha pelo menos um contato comercial antes de salvar.';
+      return;
+    }
+
+    this.salvandoContatoComercial = true;
+    this.erroEdicaoContato = '';
+
+    this.empresaService
+      .atualizarContatoComercial(empresa.cnpj, contato)
       .pipe(
         finalize(() => {
-          this.enriquecendo = false;
+          this.salvandoContatoComercial = false;
         }),
       )
       .subscribe({
         next: (response) => {
-          for (const resultado of response.dados) {
-            if (!resultado.contato) continue;
-
-            this.atualizarContatoNaTela(resultado.cnpj, resultado.contato);
-          }
-
+          this.atualizarContatoNaTela(empresa.cnpj, response.contato);
+          this.modalEdicaoContatoAberto = false;
+          this.empresaEditandoContato = null;
           this.mensagemEnriquecimento =
-            'Solicitação registrada. Os contatos ' +
-            'pendentes serão pesquisados em segundo plano.';
+            'Contatos comerciais salvos com sucesso.';
         },
         error: (error) => {
-          this.mensagemErro =
+          this.erroEdicaoContato =
             error?.error?.message ||
-            'Não foi possível solicitar o enriquecimento.';
+            'Não foi possível salvar os contatos comerciais.';
         },
       });
   }
@@ -463,6 +686,9 @@ export class ConsultaEmpresasComponent implements OnInit {
         ...empresa,
         email_comercial: contato.email_comercial,
         website: contato.website,
+        telefone_comercial: contato.telefone_comercial,
+        whatsapp: contato.whatsapp,
+        instagram: contato.instagram,
         contato_comercial: contato,
       };
     };

@@ -256,4 +256,21 @@ export class EmpresaService {
       } | null;
     }>(`${this.apiUrl}/empresas/enriquecimento/${cnpj}`);
   }
+
+  atualizarContatoComercial(
+    cnpj: string,
+    contato: Pick<
+      ContatoComercial,
+      | 'email_comercial'
+      | 'website'
+      | 'telefone_comercial'
+      | 'whatsapp'
+      | 'instagram'
+    >,
+  ) {
+    return this.http.put<{
+      message: string;
+      contato: ContatoComercial;
+    }>(`${this.apiUrl}/empresas/enriquecimento/${cnpj}/contato`, contato);
+  }
 }

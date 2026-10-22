@@ -56,7 +56,6 @@ services:
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_POOL_MAX: ${DB_POOL_MAX:-10}
-      BRAVE_SEARCH_API_KEY: ${BRAVE_SEARCH_API_KEY}
 
       # A API escuta na porta 3000 dentro do container
       API_PORT: 3000
@@ -101,7 +100,7 @@ services:
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_POOL_MAX: ${DB_POOL_MAX:-10}
-      BRAVE_SEARCH_API_KEY: ${BRAVE_SEARCH_API_KEY}
+      TAVILY_API_KEY: ${TAVILY_API_KEY}
 
       # Intervalo de consulta à fila (10 segundos)
       ENRIQUECIMENTO_INTERVALO_MS: 10000

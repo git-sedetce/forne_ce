@@ -2364,3 +2364,123 @@
     padding: 0 8px;
   }
 }
+
+.btn-edit-contact {
+  padding: 7px 11px;
+  border: 1px solid #b8d1d8;
+  border-radius: 7px;
+  background: #fff;
+  color: #075f76;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.contact-edit-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(5, 26, 34, 0.68);
+}
+
+.contact-edit-modal {
+  width: min(100%, 620px);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 24px 70px #0004;
+}
+
+.contact-edit-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 24px;
+  background: #075f76;
+  color: #fff;
+}
+
+.contact-edit-close {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 8px;
+  background: #ffffff24;
+  color: #fff;
+  cursor: pointer;
+}
+
+.contact-edit-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  padding: 22px 24px 12px;
+}
+
+.contact-edit-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #334f56;
+  font-size: 12px;
+}
+
+.contact-edit-fields input {
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 11px;
+  border: 1px solid #cbd8dc;
+  border-radius: 7px;
+}
+
+.contact-edit-full {
+  grid-column: 1 / -1;
+}
+
+.contact-edit-provenance {
+  margin: 0;
+  padding: 4px 24px 14px;
+  color: #667a80;
+  font-size: 11px;
+}
+
+.contact-edit-error {
+  margin: 0 24px 12px;
+  padding: 10px 12px;
+  border-radius: 7px;
+  background: #fff0ef;
+  color: #a1312b;
+  font-size: 12px;
+}
+
+.contact-edit-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 24px 20px;
+  border-top: 1px solid #e5ecee;
+}
+
+.contact-edit-footer button {
+  min-height: 40px;
+  padding: 0 15px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.contact-edit-cancel {
+  border: 1px solid #cbd8dc;
+  background: #fff;
+  color: #4c6268;
+}
+
+.contact-edit-save {
+  border: 0;
+  background: #087187;
+  color: #fff;
+}
