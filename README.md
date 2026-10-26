@@ -2908,192 +2908,87 @@ Próximas evoluções previstas podem incluir:
 
 
 
-**# Fluxo resumido para nova instalação**
+# Fluxo resumido para nova instalação
 
-
-
-\`\`\`bash
-
-\# Clonar
-
-git clone \<https\://github.com/Pakato14/forne_ce>
-
+```bash
+# Clonar
+git clone https://github.com/Pakato14/forne_ce
 cd forne_ce
 
-
-
-\# Configuração
-
+# Configuração
 cp .env.example .env
-
 nano .env
 
-
-
-\# PostgreSQL
-
+# PostgreSQL
 docker compose up -d
 
-
-
-\# Python
-
+# Python
 cd etl
-
 python3 -m venv .venv
-
 source .venv/bin/activate
-
 pip install -r requirements.txt
 
+# Colocar os ZIPs em:
+# etl/data/raw/
 
-
-\# Colocar os ZIPs em:
-
-\# etl/data/raw/
-
-
-
-\# Validar
-
+# Validar
 PYTHONPATH=src python src/run_etl.py --check
 
-
-
-\# Executar
-
+# Executar
 PYTHONPATH=src python src/run_etl.py
 
-
-
-\# Executar dados da JUCEC
-
+# Executar dados da JUCEC
 python src/etl_junta_empresas.py
-
-\`\`\`
-
-
-
-# Gerenciamento e atualização dos containers Docker
-
-Esta seção descreve como adicionar serviços e atualizar componentes do Observatório de Empresas do Ceará sem recriar desnecessariamente os demais containers. Execute os comandos **na raiz do projeto**, onde está o `docker-compose.yml`.
-
-> **Atenção em produção:** antes de atualizar, confirme que há backup válido do banco de dados, revise alterações no `.env`, no Compose e nas migrations. Os comandos abaixo não removem volumes. A recriação do serviço atualizado pode causar uma breve indisponibilidade desse serviço.
-
-## 1. Validar a configuração do Docker Compose
-
-```bash
-# Verificar a sintaxe e a resolução das configurações
-docker compose config --quiet
-
-# Conferir os serviços declarados
-docker compose config --services
-
-# Conferir o estado atual dos containers
-docker compose ps
 ```
 
-Se `docker compose config --quiet` retornar sem erros, a configuração passou na validação do Compose. Isso não garante que a aplicação conseguirá iniciar ou conectar-se às dependências.
+## Acréscimo de Workers e atualização dos containers
 
-## 2. Adicionar o serviço de enriquecimento (Worker)
+Execute os comandos a seguir **na raiz do projeto**, no diretório `forne_ce/`, onde está o arquivo `docker-compose.yml`. Caso esteja dentro de `etl/`, execute `cd ..` antes.
 
-O serviço `enriquecimento-worker` deve estar definido no `docker-compose.yml`, com suas variáveis de ambiente, volumes, redes e dependências configurados conforme a implementação do projeto.
+### Acréscimo do Worker
+
+Verifique a configuração do Docker Compose:
 
 ```bash
-# 1. Validar a configuração
 docker compose config --quiet
+```
 
-# 2. Construir a imagem somente do Worker
+Construa a imagem do Worker:
+
+```bash
 docker compose build enriquecimento-worker
-
-# 3. Criar e iniciar somente o Worker, sem subir dependências
-docker compose up -d --no-deps enriquecimento-worker
-
-# 4. Verificar o serviço
-docker compose ps enriquecimento-worker
-
-# 5. Acompanhar os logs
-docker compose logs -f --tail=100 enriquecimento-worker
 ```
 
-O parâmetro `--no-deps` impede que o Compose inicie ou recrie automaticamente as dependências do serviço. **As dependências necessárias, como o PostgreSQL e outros serviços usados pelo Worker, devem estar operacionais.** O comando não impede que o Worker se conecte a esses serviços.
-
-## 3. Atualizar somente a API
+Inicie somente o serviço, sem recriar suas dependências:
 
 ```bash
-# Construir a imagem atualizada da API
+docker compose up -d --no-deps enriquecimento-worker
+```
+
+### Atualização da API
+
+```bash
 docker compose build api
-
-# Recriar e iniciar somente a API
 docker compose up -d --no-deps api
-
-# Conferir status e logs
-docker compose ps api
-docker compose logs -f --tail=100 api
 ```
 
-Após a atualização, valide a rota de saúde documentada para a API (ajuste a porta conforme o ambiente):
+### Atualização do frontend
 
 ```bash
-curl -f http://localhost:3000/api/v1/health
-```
-
-## 4. Atualizar somente o frontend
-
-```bash
-# Construir a imagem atualizada do frontend
 docker compose build frontend
-
-# Recriar e iniciar somente o frontend
 docker compose up -d --no-deps frontend
-
-# Conferir status e logs
-docker compose ps frontend
-docker compose logs -f --tail=100 frontend
 ```
 
-Depois, acesse o endereço publicado pelo frontend e verifique se a interface e as chamadas à API funcionam corretamente.
-
-## 5. Atualizar somente o Worker
+### Verificação após a atualização
 
 ```bash
-docker compose build enriquecimento-worker
-docker compose up -d --no-deps enriquecimento-worker
-docker compose ps enriquecimento-worker
-docker compose logs -f --tail=100 enriquecimento-worker
+docker compose ps
+docker compose logs --tail=100 enriquecimento-worker
+docker compose logs --tail=100 api
+docker compose logs --tail=100 frontend
 ```
 
-Antes de recriar um Worker em produção, confirme se há tarefas em execução. Dependendo da implementação da fila, interromper o processo pode exigir reprocessamento ou tratamento de tarefas pendentes.
-
-## 6. Comandos úteis de operação
-
-| Operação | Comando |
-|---|---|
-| Listar containers do projeto | `docker compose ps -a` |
-| Listar serviços configurados | `docker compose config --services` |
-| Ver logs da API | `docker compose logs -f --tail=100 api` |
-| Ver logs do frontend | `docker compose logs -f --tail=100 frontend` |
-| Ver logs do Worker | `docker compose logs -f --tail=100 enriquecimento-worker` |
-| Reiniciar somente a API | `docker compose restart api` |
-| Reiniciar somente o frontend | `docker compose restart frontend` |
-| Reiniciar somente o Worker | `docker compose restart enriquecimento-worker` |
-| Ver consumo de recursos | `docker stats` |
-
-**Importante:** `docker compose restart` apenas reinicia o container existente; **não** incorpora alterações feitas no código, na imagem ou nas definições do Compose. Para aplicar uma nova imagem, execute `build` seguido de `up -d --no-deps`.
-
-## 7. Procedimento recomendado para atualização em produção
-
-1. Confirme que existe backup recuperável e registre a versão atual da imagem/código.
-2. Atualize os arquivos do projeto e revise eventuais mudanças em configurações ou migrations.
-3. Execute `docker compose config --quiet` para validar a configuração.
-4. Execute `docker compose build NOME_DO_SERVICO` para construir apenas a imagem desejada.
-5. Execute `docker compose up -d --no-deps NOME_DO_SERVICO` para aplicar a atualização.
-6. Confira `docker compose ps NOME_DO_SERVICO`, os logs e as funcionalidades afetadas.
-7. Se houver falha, investigue os logs e restaure a versão anterior da imagem/código conforme o procedimento de rollback do ambiente.
-
-> **Não execute `docker compose down -v` como procedimento de atualização.** A opção `-v` remove volumes gerenciados pelo Compose e pode provocar perda de dados. Evite também `docker compose up -d --build` sem especificar serviços quando a intenção for atualizar apenas um componente.
-
----
+> **Atenção:** os comandos com `--no-deps` não iniciam dependências que estejam paradas. O serviço atualizado poderá sofrer uma breve interrupção durante a recriação. Não use `docker compose down -v` em produção: essa opção pode remover volumes e dados persistidos do PostgreSQL.
 
 **---**
 
