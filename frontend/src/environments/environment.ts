@@ -1,4 +1,4 @@
 export const environment = {
   production: true,
-  apiUrl: 'http://localhost:8110/',
+  apiUrl: 'https://api-fornece.sde.ce.gov.br/',
 };
